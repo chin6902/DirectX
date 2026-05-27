@@ -13,6 +13,9 @@ Windows program
 static constexpr char WINDOW_CLASS[] = "GameWindow";
 static constexpr char TITLE[] = "Game";
 
+HDC hdc;
+PAINTSTRUCT ps;
+RECT rc;
 LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 int APIENTRY WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nCmdShow)
@@ -20,12 +23,12 @@ int APIENTRY WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 	WNDCLASSEX wcex
 	{
 		.cbSize = sizeof(WNDCLASSEX),
+		.style = CS_HREDRAW | CS_VREDRAW,
 		.lpfnWndProc = WndProc,
 		.hInstance = hInstance,
 		.hIcon = LoadIcon(hInstance, IDI_APPLICATION),
 		.hCursor = LoadCursor(nullptr, IDC_ARROW),
 		.hbrBackground = (HBRUSH)(GetStockObject(BLACK_BRUSH)),
-		//.lpszMenuName = nullptr,
 		.lpszClassName = WINDOW_CLASS,
 		.hIconSm = LoadIcon(wcex.hInstance, IDI_APPLICATION),
 	};
@@ -52,11 +55,24 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	switch (message)
 	{
-	case WM_DESTROY: // ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®ç ´æ£„ãƒ¡ãƒƒã‚»ãƒ¼ã‚¸
-		PostQuitMessage(0); // WM_QUITãƒ¡ãƒƒã‚»ãƒ¼ã‚¸ã®é€ä¿¡
+	case WM_CLOSE: // ƒEƒBƒ“ƒhƒE‚ð•Â‚¶‚éƒƒbƒZ[ƒW
+		if (MessageBox(hWnd, "–{“–‚ÉI—¹‚µ‚Ä‚æ‚ë‚µ‚¢‚Å‚·‚©H",
+			"Šm”F", MB_OKCANCEL | MB_DEFBUTTON2) == IDOK) 
+		{
+			DestroyWindow(hWnd); // Žw’è‚ÌƒEƒBƒ“ƒhƒE‚ÉWM_DESTROYƒƒbƒZ[ƒW‚ð‘—‚é
+		}
+		break;
+	case WM_KEYDOWN:
+		if (wParam == VK_ESCAPE) 
+		{
+			SendMessage(hWnd, WM_CLOSE, 0, 0); // WM_CLOSEƒƒbƒZ[ƒW‚Ì‘—M
+		}
+		break;
+	case WM_DESTROY: // ƒEƒBƒ“ƒhƒE‚Ì”jŠüƒƒbƒZ[ƒW
+		PostQuitMessage(0); // WM_QUITƒƒbƒZ[ƒW‚Ì‘—M
 		break;
 	default:
-		// é€šå¸¸ã®ãƒ¡ãƒƒã‚»ãƒ¼ã‚¸å‡¦ç†ã¯ã“ã®é–¢æ•°ã«ä»»ã›ã‚‹
+		// ’Êí‚ÌƒƒbƒZ[ƒWˆ—‚Í‚±‚ÌŠÖ”‚É”C‚¹‚é
 		return DefWindowProc(hWnd, message, wParam, lParam);
 	}
 	return 0;
