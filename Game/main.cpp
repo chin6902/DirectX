@@ -8,12 +8,31 @@ Windows program
 ============================================================================*/
 #include <Windows.h>
 
+#include "debug_ostream.h"
+
 int APIENTRY WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nCmdShow)
 {
-	MessageBox(nullptr, "メッセージ", "キャプション", MB_YESNOCANCEL | MB_DEFBUTTON1);
-	MessageBox(nullptr, "メッセージ", "キャプション", MB_YESNOCANCEL | MB_DEFBUTTON2);
-	MessageBox(nullptr, "メッセージ", "キャプション", MB_YESNOCANCEL | MB_DEFBUTTON3);
-	MessageBox(nullptr, "メッセージ", "キャプション", MB_YESNOCANCEL | MB_DEFBUTTON4);
+	int result = MessageBox(
+		nullptr,
+		"Delete?",
+		"Confirmation",
+		MB_YESNOCANCEL | MB_ICONEXCLAMATION
+);
+
+	switch (result)
+	{
+	case IDYES:
+		hal::dout << "You chose Yes." << std::endl;
+		break;
+	case IDNO:
+		hal::dout << "You chose No." << std::endl;
+		break;
+	case IDCANCEL:
+		hal::dout << "You chose Cancel." << std::endl;
+		break;
+	default:
+		break;
+	}
 
 	return 0;
 }
