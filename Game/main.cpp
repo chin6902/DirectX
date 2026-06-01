@@ -9,14 +9,8 @@ Windows program
 #include <SDKDDKVer.h>
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-#include <algorithm>
 
-#include "config.h"
-
-using namespace std;
-
-static constexpr char WINDOW_CLASS[] = "GameWindow";
-static constexpr char TITLE[] = "Game";
+#include "Window.h"
 
 HDC hdc;
 PAINTSTRUCT ps;
@@ -27,69 +21,42 @@ int APIENTRY WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE /*hPrevInstanc
 {
 	SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
-	WNDCLASSEX wcex
+	HWND hWnd{ CreateGameWindow(hInstance, WndProc) };
+
+	if (hWnd == nullptr)
 	{
-		.cbSize = sizeof(WNDCLASSEX),
-		.style = CS_HREDRAW | CS_VREDRAW,
-		.lpfnWndProc = WndProc,
-		.hInstance = hInstance,
-		.hIcon = LoadIcon(hInstance, IDI_APPLICATION),
-		.hCursor = LoadCursor(nullptr, IDC_ARROW),
-		.hbrBackground = (HBRUSH)(GetStockObject(BLACK_BRUSH)),
-		.lpszClassName = WINDOW_CLASS,
-		.hIconSm = LoadIcon(wcex.hInstance, IDI_APPLICATION),
-	};
+		MessageBox(
+			nullptr,
+			"Failed to create game window.",
+			"Error",
+			MB_OK | MB_ICONERROR
+		);
 
-	RegisterClassEx(&wcex);
-
-	// window size
-	RECT window_rect = { .left = 0, .top = 0, .right = SCREEN_WIDTH, .bottom = SCREEN_HEIGHT };
-
-	//window style
-	constexpr DWORD WINDOW_STYLE = WS_OVERLAPPEDWINDOW & ~(WS_THICKFRAME | WS_MAXIMIZEBOX);
-
-	AdjustWindowRect(&window_rect, WINDOW_STYLE, FALSE);
-
-	// Calculate the actual window size after adjusting for the window style
-	const int WINDOW_WIDTH { window_rect.right - window_rect.left };
-	const int WINDOW_HEIGHT { window_rect.bottom - window_rect.top };
-
-	// Get the main display desktop resolution
-	int desktop_width = GetSystemMetrics(SM_CXSCREEN);
-	int desktop_height = GetSystemMetrics(SM_CYSCREEN);
-
-	// Center the window on the desktop
-	int window_x = std::max((desktop_width - WINDOW_WIDTH) / 2, 0);
-	int window_y = std::max((desktop_height - WINDOW_HEIGHT) / 2, 0);
-
-	HWND hWnd = CreateWindow(
-		WINDOW_CLASS, TITLE, WINDOW_STYLE,
-		window_x, window_y,
-		WINDOW_WIDTH, WINDOW_HEIGHT,
-		nullptr, nullptr, hInstance, nullptr
-	);
+		return -1;
+	}
 
 	ShowWindow(hWnd, nCmdShow);
 	UpdateWindow(hWnd);
 
 	MSG msg{};
 
-	do {
-		// window message loop
+	do
+	{
+		// Window message loop
 		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
 		{
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		}
-		// game loop
-		else 
+		// Game loop
+		else
 		{
 
 		}
 
 	} while (msg.message != WM_QUIT);
 
-	return (int)msg.wParam;
+	return static_cast<int>(msg.wParam);
 }
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
