@@ -2,7 +2,7 @@
 Contents   :  [main.cpp]
               
 Author     : Chin Qing You
-LastUpdate : 2026/05/27
+LastUpdate : 2026/06/01
 -----------------------------------------------------------------------------
 Windows program
 ============================================================================*/
@@ -11,16 +11,15 @@ Windows program
 #include <Windows.h>
 
 #include "Window.h"
+#include "direct3d.h"
 
-HDC hdc;
-PAINTSTRUCT ps;
-RECT rc;
 LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 int APIENTRY WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE /*hPrevInstance*/, _In_ LPSTR /*lpCmdLine*/, _In_ int nCmdShow)
 {
 	SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
+	// ウィンドウの作成
 	HWND hWnd{ CreateGameWindow(hInstance, WndProc) };
 
 	if (hWnd == nullptr)
@@ -34,27 +33,36 @@ int APIENTRY WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE /*hPrevInstanc
 
 		return -1;
 	}
-
-	ShowWindow(hWnd, nCmdShow);
-	UpdateWindow(hWnd);
-
+	
 	MSG msg{};
 
-	do
+	// Direct3Dの初期化
+	if (Direct3DInitialize(hWnd))
 	{
-		// Window message loop
-		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
-		{
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-		}
-		// Game loop
-		else
-		{
 
-		}
+		ShowWindow(hWnd, nCmdShow);
+		UpdateWindow(hWnd);
 
-	} while (msg.message != WM_QUIT);
+		do
+		{
+			// Window message loop
+			if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+			{
+				TranslateMessage(&msg);
+				DispatchMessage(&msg);
+			}
+			// Game loop
+			else
+			{
+				Direct3D_Begin();
+				Direct3D_Flip();
+			}
+
+		} while (msg.message != WM_QUIT);
+	}
+
+	// Direct3Dの終了処理
+	Direct3DFinalize();
 
 	return static_cast<int>(msg.wParam);
 }

@@ -1,16 +1,21 @@
 /*============================================================================
-Contents   :  [Window.h]
+Contents   :  [direct3d.h]
               
 Author     : Chin Qing You
 LastUpdate : 2026/06/01
 -----------------------------------------------------------------------------
 
 ============================================================================*/
-#ifndef WINDOW_H
-#define WINDOW_H
+#ifndef DIRECT3D_H
+#define DIRECT3D_H
 
+// safe release macro
+#define SAFE_RELEASE(o) if (o) { (o)->Release(); o = NULL; } 
 #include <Windows.h>
 
-HWND CreateGameWindow(HINSTANCE hInstance, WNDPROC wndProc);
+bool Direct3DInitialize(HWND window_handle);
+void Direct3DFinalize();
+void Direct3D_Begin();
+void Direct3D_Flip();
 
 #endif
