@@ -12,6 +12,8 @@ Windows program
 
 #include "Window.h"
 #include "direct3d.h"
+#include "shader.h"
+#include "polygon.h"
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
@@ -39,6 +41,11 @@ int APIENTRY WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE /*hPrevInstanc
 	// Direct3D‚Ì‰Šú‰»
 	if (Direct3DInitialize(hWnd))
 	{
+		// shader‚Ì‰Šú‰»
+		Shader_Initialize(Direct3D_GetDevice(), Direct3D_GetDeviceContext());
+
+		// polygon‚Ì‰Šú‰»
+		Polygon_Initialize();
 
 		ShowWindow(hWnd, nCmdShow);
 		UpdateWindow(hWnd);
@@ -55,11 +62,18 @@ int APIENTRY WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE /*hPrevInstanc
 			else
 			{
 				Direct3D_Begin();
+				Polygon_Draw();
 				Direct3D_Flip();
 			}
 
 		} while (msg.message != WM_QUIT);
 	}
+
+	// polygon‚ÌI—¹ˆ—
+	Polygon_Finalize();
+
+	// shader‚ÌI—¹ˆ—
+	Shader_Finalize();
 
 	// Direct3D‚ÌI—¹ˆ—
 	Direct3DFinalize();

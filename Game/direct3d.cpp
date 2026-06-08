@@ -11,6 +11,7 @@ LastUpdate : 2026/06/03
 #include <iostream>
 
 #include "debug_ostream.h"
+#include "config.h"
 #include "direct3d.h"
 
 //Direct 3D device, device context, and swap chain
@@ -81,6 +82,17 @@ bool Direct3DInitialize(HWND window_handle)
 		return false;
 	}
 
+    static D3D11_VIEWPORT viewport{};
+    // ビューポートの設定
+    viewport.TopLeftX = 0.0f;
+    viewport.TopLeftY = 0.0f;
+    viewport.Width = (float)(SCREEN_WIDTH);
+    viewport.Height = (float)(SCREEN_HEIGHT);
+    viewport.MinDepth = 0.0f;
+    viewport.MaxDepth = 1.0f;
+
+	g_pDeviceContext->RSSetViewports(1, &viewport);
+
     return true;
 }
 
@@ -97,11 +109,24 @@ void Direct3D_Begin()
     float clear_color[4] = { 0.2f, 0.4f, 0.8f, 1.0f };
     g_pDeviceContext->ClearRenderTargetView(g_pRenderTargetView, clear_color);
     g_pDeviceContext->ClearDepthStencilView(g_pDepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
+
+    //レンダーターゲットビューとデプスステンシルビューの設定
+    g_pDeviceContext->OMSetRenderTargets(1, &g_pRenderTargetView, g_pDepthStencilView);
 }
 
 void Direct3D_Flip()
 {
     g_pSwapChain->Present(1, 0);
+}
+
+ID3D11Device* Direct3D_GetDevice()
+{
+    return g_pDevice;
+}
+
+ID3D11DeviceContext* Direct3D_GetDeviceContext()
+{
+    return g_pDeviceContext;
 }
 
 bool CreateBackBuffer()

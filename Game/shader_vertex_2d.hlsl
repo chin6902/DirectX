@@ -1,7 +1,22 @@
 // 2D vertex shader
 float4x4 mtx; 
 
-float4 main( float4 posL : POSITION0 ) : SV_POSITION
+struct VS_INPUT
 {
-	return mul(posL, mtx);
+    float4 posL : POSITION0;
+    float4 color : COLOR0;
+};
+
+struct VS_OUTPUT
+{
+    float4 posH : SV_POSITION;
+    float4 color : COLOR0;
+};
+
+VS_OUTPUT main( VS_INPUT input )
+{
+	VS_OUTPUT output;
+	output.posH = mul(input.posL, mtx);
+	output.color = input.color;
+	return output;
 }
