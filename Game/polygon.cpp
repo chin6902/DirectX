@@ -14,19 +14,24 @@ LastUpdate : 2026/06/08
 #include "polygon.h"
 #include "direct3d.h"
 #include "shader.h"
+#include "texture.h"
 
 using namespace DirectX;
 
-static ID3D11Buffer* g_pVertexBuffer = nullptr;
+static ID3D11Buffer* g_pVertexBuffer{ nullptr };
+static ID3D11SamplerState* g_pSamplerState{ nullptr };
+static ID3D11BlendState* g_pBlendState{ nullptr };
+static int g_TextureID{ TEXTURE_INVALID_ID };
 
-// È†ÇÁÇπÊßãÈÄ†‰Ωì
+// í∏ì_ç\ë¢ëÃ
 struct Vertex
 {
     XMFLOAT3 position;
     XMFLOAT4 color;
+    XMFLOAT2 texcoord;
 };
 
-static constexpr int NUM_VERTEX { 6 };
+static constexpr int NUM_VERTEX { 4 };
 
 bool Polygon_Initialize()
 {
@@ -42,55 +47,107 @@ bool Polygon_Initialize()
 
 	if (FAILED(hr))
 	{
-		hal::dout << "Polygon_Initialize() : È†ÇÁÇπ„Éê„ÉÉ„Éï„Ç°„ÅÆ‰ΩúÊàê„Å´Â§±Êïó„Åó„Åæ„Åó„Åü" << std::endl;
+		hal::dout << "Polygon_Initialize() : í∏ì_ÉoÉbÉtÉ@ÇÃçÏê¨Ç…é∏îsÇµÇ‹ÇµÇΩ" << std::endl;
 		return false;
 	}
+
+	// ÉeÉNÉXÉ`ÉÉÇÃì«Ç›çûÇ›
+	g_TextureID = Texture_Load(L"ochaduke.png", false);
+
+    D3D11_SAMPLER_DESC sd{};
+    sd.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR; // ÉtÉBÉãÉ^ÉäÉìÉOê›íË (MIPMAPÉäÉjÉA)
+    sd.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;  // îÕàÕäOÇÃàµÇ¢ (â°ï˚å¸ÅFÉNÉâÉìÉv)
+    sd.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;  // îÕàÕäOÇÃàµÇ¢ (ècï˚å¸ÅFÉNÉâÉìÉv)
+    sd.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;  // îÕàÕäOÇÃàµÇ¢ (âúçsï˚å¸ÅFÉNÉâÉìÉv)
+    sd.ComparisonFunc = D3D11_COMPARISON_NEVER;
+    sd.MinLOD = 0;
+    sd.MaxLOD = D3D11_FLOAT32_MAX;
+
+    Direct3D_GetDevice()->CreateSamplerState(&sd, &g_pSamplerState);
+
+	// ÉuÉåÉìÉhÉXÉeÅ[ÉgÇÃê›íË(îºìßñæÇÃê›íË)
+    D3D11_BLEND_DESC blend_desc{};
+    blend_desc.RenderTarget[0].BlendEnable = TRUE;
+
+	blend_desc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA; // ï`âÊÇ∑ÇÈêFÇÃåWêî
+    blend_desc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA; // Ç∑Ç≈Ç…Ç†ÇÈêFÇÃåWêî
+    blend_desc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+
+    blend_desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+    blend_desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+    blend_desc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+
+	//rgb = src_rgb * src_alpha + dest_rgb * (1 - src_alpha)
+
+    blend_desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+
+    Direct3D_GetDevice()->CreateBlendState(&blend_desc, &g_pBlendState);
 
     return true;
 }
 
 void Polygon_Finalize()
 {
+    Texture_AllRelease();
+	SAFE_RELEASE(g_pBlendState);
+    SAFE_RELEASE(g_pSamplerState);
 	SAFE_RELEASE(g_pVertexBuffer);
+
 }
 
 void Polygon_Draw()
 {
-	//„Ç∑„Çß„Éº„ÉÄ„Éº„ÇíË®≠ÂÆö„Åô„Çã
+	//ÉVÉFÅ[É_Å[Çê›íËÇ∑ÇÈ
 	Shader_Begin();
 
-	//Â∫ßÊ®ôÂ§âÊèõÁî®Ë°åÂàó„ÇíÈ†ÇÁÇπ„Ç∑„Çß„Éº„ÉÄ„Éº„Å´Ë®≠ÂÆö„Åô„Çã
+	//ç¿ïWïœä∑ópçsóÒÇí∏ì_ÉVÉFÅ[É_Å[Ç…ê›íËÇ∑ÇÈ
     Shader_SetMatrix(XMMatrixOrthographicOffCenterLH(0.0f, SCREEN_WIDTH, SCREEN_HEIGHT, 0.0f, 0.0f, 1.0f));
 
-    //È†ÇÁÇπ„Éê„ÉÉ„Éï„Ç°„Çí„É≠„ÉÉ„ÇØ„Åô„Çã
+    //í∏ì_ÉoÉbÉtÉ@ÇÉçÉbÉNÇ∑ÇÈ
     D3D11_MAPPED_SUBRESOURCE msr;
     Direct3D_GetDeviceContext()->Map(g_pVertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &msr);
 
-    //È†ÇÁÇπ„Éê„ÉÉ„Éï„Ç°„Å∏„ÅÆ‰ªÆÊÉ≥„Ç¢„Éâ„É¨„Çπ„ÇíÂèñÂæó
-    Vertex* v = (Vertex*)msr.pData;
+    //í∏ì_ÉoÉbÉtÉ@Ç÷ÇÃâºëzÉAÉhÉåÉXÇéÊìæ
+    Vertex* v = (Vertex*)msr.pData; 
 
-    //ÁîªÈù¢„ÅÆÂ∑¶‰∏ä„Åã„ÇâÂè≥‰∏ã„Å´Âêë„Åã„ÅÜÁ∑öÂàÜ„ÇíÊèèÁîª„Åô„Çã
+    //âÊñ ÇÃç∂è„Ç©ÇÁâEâ∫Ç…å¸Ç©Ç§ê¸ï™Çï`âÊÇ∑ÇÈ
     v[0].position = { 100.0f, 100.0f, 0.0f };
-    v[0].color = { 1.0f, 0.0f, 0.0f, 1.0f }; // Ëµ§
+    v[0].color = { 1.0f, 0.0f, 0.0f, 1.0f }; // ê‘
+    v[0].texcoord = { 0.0f , 0.0f };
+
     v[1].position = { 500.0f, 100.0f, 0.0f };
-    v[1].color = { 0.0f, 1.0f, 0.0f, 1.0f }; // Á∑ë  
+    v[1].color = { 0.0f, 1.0f, 0.0f, 1.0f }; // óŒ  
+    v[1].texcoord = { 1.0f , 0.0f };
+
     v[2].position = { 100.0f, 500.0f, 0.0f };
-    v[2].color = { 0.0f, 0.0f, 1.0f, 1.0f }; // Èùí
+    v[2].color = { 0.0f, 0.0f, 1.0f, 1.0f }; // ê¬
+    v[2].texcoord = { 0.0f , 1.0f };
+
     v[3].position = { 500.0f, 500.0f, 0.0f };
-    v[3].color = { 1.0f, 1.0f, 0.0f, 1.0f }; // ÈªÑËâ≤
+    v[3].color = { 1.0f, 1.0f, 0.0f, 1.0f }; // â©êF
+    v[3].texcoord = { 1.0f , 1.0f };
     //v[4].position = { 600.0f, 100.0f, 0.0f };
     //v[5].position = { 600.0f, 500.0f, 0.0f };
 
-    //È†ÇÁÇπ„Éê„ÉÉ„Éï„Ç°„ÅÆ„É≠„ÉÉ„ÇØ„ÇíËß£Èô§
+    //í∏ì_ÉoÉbÉtÉ@ÇÃÉçÉbÉNÇâèú
     Direct3D_GetDeviceContext()->Unmap(g_pVertexBuffer, 0);
 
-    //È†ÇÁÇπ„Éê„ÉÉ„Éï„Ç°„ÇíÊèèÁîª„Éë„Ç§„Éó„É©„Ç§„É≥„Å´Ë®≠ÂÆö
+    //í∏ì_ÉoÉbÉtÉ@Çï`âÊÉpÉCÉvÉâÉCÉìÇ…ê›íË
     UINT stride = sizeof(Vertex);
     UINT offset = 0;
     Direct3D_GetDeviceContext()->IASetVertexBuffers(0, 1, &g_pVertexBuffer, &stride, &offset);
 
-	//„Éó„É™„Éü„ÉÜ„Ç£„Éñ„Éà„Éù„É≠„Ç∏„ÉºË®≠ÂÆö
+	//ÉvÉäÉ~ÉeÉBÉuÉgÉ|ÉçÉWÅ[ê›íË
     Direct3D_GetDeviceContext()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
-    Direct3D_GetDeviceContext()->Draw(4, 0);
+    //ëÊàÍà¯êîÇÕÉXÉçÉbÉgî‘çÜ(ÉVÉFÅ[É_Å[ë§ÇÃregister(s0))
+    Direct3D_GetDeviceContext()->PSSetSamplers(0, 1, &g_pSamplerState);
+
+	//ÉsÉNÉZÉãÉVÉFÅ[É_Å[Ç…ÉeÉNÉXÉ`ÉÉÇê›íËÇ∑ÇÈ
+	Texture_SetTexture(g_TextureID);
+
+	//ÉuÉåÉìÉhÉXÉeÅ[ÉgÇÃê›íË
+    Direct3D_GetDeviceContext()->OMSetBlendState(g_pBlendState, nullptr, 0xffffffff);
+
+    Direct3D_GetDeviceContext()->Draw(NUM_VERTEX, 0);
 }
