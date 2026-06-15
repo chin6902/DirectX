@@ -4,7 +4,7 @@ Contents   :  [polygon.cpp]
 Author     : Chin Qing You
 LastUpdate : 2026/06/08
 -----------------------------------------------------------------------------
-
+practice file
 ============================================================================*/
 #include <d3d11.h>
 #include <DirectXMath.h>

@@ -1,16 +1,19 @@
 /*============================================================================
-Contents   :  [polygon.h]
+Contents   :  [application.h]
               
 Author     : Chin Qing You
-LastUpdate : 2026/06/08
+LastUpdate : 2026/06/15
 -----------------------------------------------------------------------------
-practice file
-============================================================================*/
-#ifndef POLYGON_H
-#define POLYGON_H
 
-bool Polygon_Initialize();
-void Polygon_Finalize();
-void Polygon_Draw();
+============================================================================*/
+#ifndef APPLICATION_H
+#define APPLICATION_H
+
+#include <Windows.h>
+
+bool Application_Initialize(HWND hWnd);
+void Application_Finalize();
+void Application_Update();
+void Application_Draw();
 
 #endif

@@ -10,6 +10,6 @@ SamplerState major_sampler : register(s0); // サンプラー
 
 float4 main(PS_INPUT input) : SV_TARGET
 {
-	return major_texture.Sample(major_sampler, input.uv);
+	return major_texture.Sample(major_sampler, input.uv) * input.color;
 }
 

@@ -14,7 +14,7 @@ LastUpdate : 2026/06/01
 namespace
 {
 	static constexpr char WINDOW_CLASS[] = "GameWindow";
-	static constexpr char TITLE[] = "Game";
+	static constexpr char TITLE[] = "GP11B114_19_Game";
 
 	constexpr DWORD WINDOW_STYLE
 	{

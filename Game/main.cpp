@@ -11,9 +11,8 @@ Windows program
 #include <Windows.h>
 
 #include "Window.h"
-#include "direct3d.h"
-#include "shader.h"
-#include "polygon.h"
+#include "application.h"
+#include "combaseapi.h"
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
@@ -39,15 +38,9 @@ int APIENTRY WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE /*hPrevInstanc
 	
 	MSG msg{};
 
-	// Direct3Dの初期化
-	if (Direct3DInitialize(hWnd))
+	// 各システムの初期化
+	if (Application_Initialize(hWnd))
 	{
-		// shaderの初期化
-		Shader_Initialize(Direct3D_GetDevice(), Direct3D_GetDeviceContext());
-
-		// polygonの初期化
-		Polygon_Initialize();
-
 		ShowWindow(hWnd, nCmdShow);
 		UpdateWindow(hWnd);
 
@@ -62,22 +55,15 @@ int APIENTRY WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE /*hPrevInstanc
 			// Game loop
 			else
 			{
-				Direct3D_Begin();
-				Polygon_Draw();
-				Direct3D_Flip();
+				Application_Update();
+				Application_Draw();
 			}
 
 		} while (msg.message != WM_QUIT);
 	}
 
-	// polygonの終了処理
-	Polygon_Finalize();
-
-	// shaderの終了処理
-	Shader_Finalize();
-
-	// Direct3Dの終了処理
-	Direct3DFinalize();
+	// 各システムの終了処理
+	Application_Finalize();
 
 	return static_cast<int>(msg.wParam);
 }
