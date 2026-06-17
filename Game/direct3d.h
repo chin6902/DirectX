@@ -14,6 +14,8 @@ LastUpdate : 2026/06/01
 #include <Windows.h>
 #include <d3d11.h>
 
+static constexpr bool USE_VSYNC = true;
+
 bool Direct3DInitialize(HWND window_handle);
 void Direct3DFinalize();
 void Direct3D_Begin();

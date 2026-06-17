@@ -41,6 +41,7 @@ bool Direct3DInitialize(HWND window_handle)
     swap_chain_desc.SampleDesc.Quality = 0;     
     swap_chain_desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;     
     swap_chain_desc.OutputWindow = window_handle;
+    swap_chain_desc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
 
     UINT device_flags = 0;
 
@@ -83,7 +84,7 @@ bool Direct3DInitialize(HWND window_handle)
 	}
 
     static D3D11_VIEWPORT viewport{};
-    // ãƒ“ãƒ¥ãƒ¼ãƒãƒ¼ãƒˆã®è¨­å®š
+    // ƒrƒ…[ƒ|[ƒg‚ÌÝ’è
     viewport.TopLeftX = 0.0f;
     viewport.TopLeftY = 0.0f;
     viewport.Width = (float)(SCREEN_WIDTH);
@@ -110,13 +111,21 @@ void Direct3D_Begin()
     g_pDeviceContext->ClearRenderTargetView(g_pRenderTargetView, clear_color);
     g_pDeviceContext->ClearDepthStencilView(g_pDepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
-    //ãƒ¬ãƒ³ãƒ€ãƒ¼ã‚¿ãƒ¼ã‚²ãƒƒãƒˆãƒ“ãƒ¥ãƒ¼ã¨ãƒ‡ãƒ—ã‚¹ã‚¹ãƒ†ãƒ³ã‚·ãƒ«ãƒ“ãƒ¥ãƒ¼ã®è¨­å®š
+    //ƒŒƒ“ƒ_[ƒ^[ƒQƒbƒgƒrƒ…[‚ÆƒfƒvƒXƒXƒeƒ“ƒVƒ‹ƒrƒ…[‚ÌÝ’è
     g_pDeviceContext->OMSetRenderTargets(1, &g_pRenderTargetView, g_pDepthStencilView);
 }
 
 void Direct3D_Flip()
 {
-    g_pSwapChain->Present(1, 0);
+    if (USE_VSYNC)
+    {
+        g_pSwapChain->Present(1, 0);
+    }
+    else 
+    {
+        g_pSwapChain->Present(1, DXGI_PRESENT_ALLOW_TEARING);
+    }
+    
 }
 
 ID3D11Device* Direct3D_GetDevice()
