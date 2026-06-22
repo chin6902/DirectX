@@ -16,6 +16,14 @@ LastUpdate : 2026/06/15
 bool Sprite_Initialize();
 void Sprite_Finalize();
 
+enum SpriteFilter
+{
+    kSpriteFilter_Point,
+    kSpriteFilter_Linear
+};
+
+void Sprite_SetFilter(SpriteFilter filter);
+
 //好きなテクスチャを好きな座標に描画する
 void Sprite_Draw(int texture_ID, float x, float y, const DirectX::XMFLOAT4& color = { 1.0f, 1.0f, 1.0f, 1.0f });
 

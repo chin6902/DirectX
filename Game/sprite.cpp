@@ -5,6 +5,7 @@ Author     : Chin Qing You
 LastUpdate : 2026/06/15
 -----------------------------------------------------------------------------
 //instancing & render state management (update needed)
+//make switch statements for settings 
 ============================================================================*/
 #include "debug_ostream.h"
 #include "config.h"
@@ -16,11 +17,14 @@ LastUpdate : 2026/06/15
 using namespace DirectX;
 
 static ID3D11Buffer* g_pVertexBuffer{ nullptr };
-static ID3D11SamplerState* g_pSamplerState{ nullptr };
+static ID3D11SamplerState* g_pSamplerState_Point{ nullptr };
+static ID3D11SamplerState* g_pSamplerState_Linear{ nullptr };
+
 static ID3D11BlendState* g_pBlendState{ nullptr };
 static ID3D11DepthStencilState* g_pDepthStencilState{ nullptr };
 static ID3D11Buffer* g_pVSConstantBuffer1{ nullptr }; 
 static ID3D11Buffer* g_pPSConstantBuffer0{ nullptr }; 
+static ID3D11RasterizerState* g_pRasterizerState{ nullptr };
 
 // 頂点構造体
 struct Vertex
@@ -96,7 +100,10 @@ bool Sprite_Initialize()
     sd.MinLOD = 0;
     sd.MaxLOD = D3D11_FLOAT32_MAX;
 
-    Direct3D_GetDevice()->CreateSamplerState(&sd, &g_pSamplerState);
+    Direct3D_GetDevice()->CreateSamplerState(&sd, &g_pSamplerState_Point);
+
+    sd.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+    Direct3D_GetDevice()->CreateSamplerState(&sd, &g_pSamplerState_Linear);
 
     // ブレンドステートの設定(半透明の設定)
     D3D11_BLEND_DESC blend_desc{};
@@ -126,6 +133,15 @@ bool Sprite_Initialize()
     */
 
     Direct3D_GetDevice()->CreateDepthStencilState(&dsd, &g_pDepthStencilState);
+
+    // ラスタライザーステートの作成 
+    D3D11_RASTERIZER_DESC rasterizer_desc{};
+    rasterizer_desc.FillMode = D3D11_FILL_SOLID;
+    rasterizer_desc.CullMode = D3D11_CULL_NONE;
+    //rasterizer_desc.FrontCounterClockwise = FALSE;
+
+    Direct3D_GetDevice()->CreateRasterizerState(&rasterizer_desc, &g_pRasterizerState);
+    Direct3D_GetDeviceContext()->RSSetState(g_pRasterizerState);
     
     return true;
 }
@@ -133,12 +149,31 @@ bool Sprite_Initialize()
 void Sprite_Finalize()
 {
     Texture_AllRelease();
+    SAFE_RELEASE(g_pRasterizerState);
     SAFE_RELEASE(g_pDepthStencilState);
     SAFE_RELEASE(g_pBlendState);
-    SAFE_RELEASE(g_pSamplerState);
+    SAFE_RELEASE(g_pSamplerState_Point);
+    SAFE_RELEASE(g_pSamplerState_Linear);
     SAFE_RELEASE(g_pPSConstantBuffer0);
 	SAFE_RELEASE(g_pVSConstantBuffer1);
     SAFE_RELEASE(g_pVertexBuffer);
+}
+
+void Sprite_SetFilter(SpriteFilter filter)
+{
+    switch (filter)
+    {
+    case kSpriteFilter_Point:
+        //第一引数はスロット番号(シェーダー側のregister(s0))
+        Direct3D_GetDeviceContext()->PSSetSamplers(0, 1, &g_pSamplerState_Point);
+        break;
+    case kSpriteFilter_Linear:
+        Direct3D_GetDeviceContext()->PSSetSamplers(0, 1, &g_pSamplerState_Linear);
+        break;
+    default:
+        Direct3D_GetDeviceContext()->PSSetSamplers(0, 1, &g_pSamplerState_Point);
+        break;
+    }
 }
 
 void Sprite_Draw(int texture_ID, float x, float y, const DirectX::XMFLOAT4& color)
@@ -153,7 +188,7 @@ void Sprite_Draw(int texture_ID, float x, float y, float width, float height, co
 
     //変換行列を設定する
     XMMATRIX mtxScaling = XMMatrixScaling(width, height, 1.0f);
-    XMMATRIX mtxTranslation = XMMatrixTranslation(x + width * 0.5, y + height * 0.5, 0.0f);
+    XMMATRIX mtxTranslation = XMMatrixTranslation(x + width * 0.5f, y + height * 0.5f, 0.0f);
     XMMATRIX mtxProjection = XMMatrixOrthographicOffCenterLH(0.0f, SCREEN_WIDTH, SCREEN_HEIGHT, 0.0f, 0.0f, 1.0f);
 
     XMMATRIX mtx = mtxScaling * mtxTranslation * mtxProjection; //行列を合成
@@ -173,9 +208,6 @@ void Sprite_Draw(int texture_ID, float x, float y, float width, float height, co
 
     //プリミティブトポロジー設定
     Direct3D_GetDeviceContext()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-
-    //第一引数はスロット番号(シェーダー側のregister(s0))
-    Direct3D_GetDeviceContext()->PSSetSamplers(0, 1, &g_pSamplerState);
 
     //ピクセルシェーダーにテクスチャを設定する
     Texture_SetTexture(texture_ID);
@@ -200,8 +232,8 @@ void Sprite_Draw(int texture_ID, float x, float y, float width, float height, fl
     Shader_Begin();
 
 	//変換行列を設定する
-    XMMATRIX mtxScaling = XMMatrixScaling(width, height, 1.0f);
-	XMMATRIX mtxTranslation = XMMatrixTranslation(x + width * 0.5, y + height * 0.5, 0.0f);
+	XMMATRIX mtxScaling = XMMatrixScaling(width, height, 1.0f);
+	XMMATRIX mtxTranslation = XMMatrixTranslation(x + width * 0.5f, y + height * 0.5f, 0.0f);
 	XMMATRIX mtxProjection = XMMatrixOrthographicOffCenterLH(0.0f, SCREEN_WIDTH, SCREEN_HEIGHT, 0.0f, 0.0f, 1.0f);
 
 	XMMATRIX mtx = mtxScaling * mtxTranslation * mtxProjection; //行列を合成
@@ -233,9 +265,6 @@ void Sprite_Draw(int texture_ID, float x, float y, float width, float height, fl
     //プリミティブトポロジー設定
     Direct3D_GetDeviceContext()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
-    //第一引数はスロット番号(シェーダー側のregister(s0))
-    Direct3D_GetDeviceContext()->PSSetSamplers(0, 1, &g_pSamplerState);
-
     //ピクセルシェーダーにテクスチャを設定する
     Texture_SetTexture(texture_ID);
 
@@ -256,7 +285,7 @@ void Sprite_Draw(int texture_ID, float x, float y, float width, float height, fl
     //変換行列を設定する
     XMMATRIX mtxScaling = XMMatrixScaling(width * scale.x, height * scale.y, 1.0f);
     XMMATRIX mtxRotation = XMMatrixRotationZ(angle);
-    XMMATRIX mtxTranslation = XMMatrixTranslation(x + width * 0.5, y + height * 0.5, 0.0f);
+    XMMATRIX mtxTranslation = XMMatrixTranslation(x + width * 0.5f, y + height * 0.5f, 0.0f);
     XMMATRIX mtxProjection = XMMatrixOrthographicOffCenterLH(0.0f, SCREEN_WIDTH, SCREEN_HEIGHT, 0.0f, 0.0f, 1.0f);
 
     XMMATRIX mtx = mtxScaling * mtxRotation * mtxTranslation * mtxProjection; //行列を合成
@@ -289,9 +318,6 @@ void Sprite_Draw(int texture_ID, float x, float y, float width, float height, fl
 
     //プリミティブトポロジー設定
     Direct3D_GetDeviceContext()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-
-    //第一引数はスロット番号(シェーダー側のregister(s0))
-    Direct3D_GetDeviceContext()->PSSetSamplers(0, 1, &g_pSamplerState);
 
     //ピクセルシェーダーにテクスチャを設定する
     Texture_SetTexture(texture_ID);

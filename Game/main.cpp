@@ -51,6 +51,9 @@ int APIENTRY WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE /*hPrevInstanc
 	int frame_counter = 0;         // フレーム数の累積カウント
 	double fps = 0.0;              // 算出されたFPS値
 
+	double fixed_time_accumulator = 0.0;
+	static constexpr double FIXED_DELTA_TIME = 1.0 / 60.0;
+
 	// 各システムの初期化
 	if (Application_Initialize(hWnd))
 	{
@@ -58,7 +61,7 @@ int APIENTRY WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE /*hPrevInstanc
 		hal::DebugText debug_text(
 			Direct3D_GetDevice(),
 			Direct3D_GetDeviceContext(),
-			L"Sixtyfour-Regular_ascii_512.png",
+			L"assets/textures/Sixtyfour-Regular_ascii_512.png",
 			SCREEN_WIDTH, SCREEN_HEIGHT
 		);
 #endif
@@ -84,8 +87,15 @@ int APIENTRY WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE /*hPrevInstanc
 			{
 				// FPS表示 からの追加: 前回のフレームからの経過時間（秒）を取得
 				elapsed_time = SystemTimer_GetElapsedTime(); 
-				time_accumulator += elapsed_time; 
-				frame_counter++; 
+
+				// 1フレーム当たりの最大経過時間を0.1秒(100ms)に制限する
+				if (elapsed_time > 0.1)
+				{
+					elapsed_time = 0.1;
+				}
+
+				time_accumulator += elapsed_time;
+				frame_counter++;
 
 				// 1.0秒経過したら、その間のフレーム数からFPSを確定して累積をリセット
 				if (time_accumulator >= 1.0)
@@ -95,8 +105,23 @@ int APIENTRY WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE /*hPrevInstanc
 					time_accumulator = 0.0; 
 				}
 
-				Application_Update();
+				// 固定フレームのための経過時間の累積
+				fixed_time_accumulator += elapsed_time;
+
+				int update_count = 0;
+
+				// 1/60秒経ったら実行する
+				while (fixed_time_accumulator >= FIXED_DELTA_TIME && update_count < 5)
+				{
+					Application_FixedUpdate();
+					fixed_time_accumulator -= FIXED_DELTA_TIME;
+					update_count++;
+				}
+
 				Direct3D_Begin();
+
+				Application_Update((float)elapsed_time);
+
 				Application_Draw();
 
 #ifdef _DEBUG
