@@ -20,6 +20,8 @@ Windows program
 #include "direct3d.h"
 #include "config.h"
 #include "system_timer.h"
+#include "keyboard.h"
+#include "mouse.h"
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
@@ -156,15 +158,37 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			DestroyWindow(hWnd); // 指定のウィンドウにWM_DESTROYメッセージを送る
 		}
 		break;
-	case WM_KEYDOWN:
-		if (wParam == VK_ESCAPE) 
-		{
-			SendMessage(hWnd, WM_CLOSE, 0, 0); // WM_CLOSEメッセージの送信
-		}
-		break;
 	case WM_DESTROY: // ウィンドウの破棄メッセージ
 		PostQuitMessage(0); // WM_QUITメッセージの送信
 		break;
+    case WM_ACTIVATEAPP:
+		Keyboard_ProcessMessage(message, wParam, lParam);
+		Mouse_ProcessMessage(message, wParam, lParam);
+		break;
+    case WM_KEYDOWN:
+		if (wParam == VK_ESCAPE)
+		{
+			SendMessage(hWnd, WM_CLOSE, 0, 0); // WM_CLOSEメッセージの送信
+		}
+    case WM_SYSKEYDOWN:
+    case WM_KEYUP:
+    case WM_SYSKEYUP:
+        Keyboard_ProcessMessage(message, wParam, lParam);
+        break;
+    case WM_INPUT:
+    case WM_MOUSEMOVE:
+    case WM_LBUTTONDOWN:
+    case WM_LBUTTONUP:
+    case WM_RBUTTONDOWN:
+    case WM_RBUTTONUP:
+    case WM_MBUTTONDOWN:
+    case WM_MBUTTONUP:
+    case WM_MOUSEWHEEL:
+    case WM_XBUTTONDOWN:
+    case WM_XBUTTONUP:
+    case WM_MOUSEHOVER:
+        Mouse_ProcessMessage(message, wParam, lParam);
+        break; 
 	default:
 		// 通常のメッセージ処理はこの関数に任せる
 		return DefWindowProc(hWnd, message, wParam, lParam);
