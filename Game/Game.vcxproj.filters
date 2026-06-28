@@ -70,6 +70,18 @@
     <ClCompile Include="mouse.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="game.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="runner.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="coin.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="food.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="debug_ostream.h">
@@ -124,6 +136,18 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="mouse.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="game.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="runner.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="coin.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="food.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

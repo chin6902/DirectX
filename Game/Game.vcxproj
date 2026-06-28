@@ -149,9 +149,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="application.cpp" />
+    <ClCompile Include="coin.cpp" />
     <ClCompile Include="debug_text.cpp" />
     <ClCompile Include="direct3d.cpp" />
     <ClCompile Include="flipbook_animation.cpp" />
+    <ClCompile Include="food.cpp" />
+    <ClCompile Include="game.cpp" />
     <ClCompile Include="input_keyboard.cpp" />
     <ClCompile Include="input_mouse.cpp" />
     <ClCompile Include="input_xinput.cpp" />
@@ -159,6 +162,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="mouse.cpp" />
     <ClCompile Include="polygon.cpp" />
+    <ClCompile Include="runner.cpp" />
     <ClCompile Include="shader.cpp" />
     <ClCompile Include="sprite.cpp" />
     <ClCompile Include="system_timer.cpp" />
@@ -168,17 +172,21 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="application.h" />
+    <ClInclude Include="coin.h" />
     <ClInclude Include="config.h" />
     <ClInclude Include="debug_ostream.h" />
     <ClInclude Include="debug_text.h" />
     <ClInclude Include="direct3d.h" />
     <ClInclude Include="flipbook_animation.h" />
+    <ClInclude Include="food.h" />
+    <ClInclude Include="game.h" />
     <ClInclude Include="input_keyboard.h" />
     <ClInclude Include="input_mouse.h" />
     <ClInclude Include="input_xinput.h" />
     <ClInclude Include="keyboard.h" />
     <ClInclude Include="mouse.h" />
     <ClInclude Include="polygon.h" />
+    <ClInclude Include="runner.h" />
     <ClInclude Include="shader.h" />
     <ClInclude Include="sprite.h" />
     <ClInclude Include="system_timer.h" />

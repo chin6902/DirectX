@@ -99,7 +99,7 @@ void FlipBookAnimation_Update(float delta_time)
 
 void FlipBookAnimation_Draw(int animation_id, float x, float y)
 {
-	FlipBookAnimation_Draw(animation_id, x, y, { 1.0f, 1.0f, 1.0f, 1.0f });
+	FlipBookAnimation_Draw(animation_id, x, y, SpriteDrawParams{});
 }
 /*
 void FlipBookAnimation_Draw(int animation_id, float x, float y)
@@ -115,30 +115,27 @@ void FlipBookAnimation_Draw(int animation_id, float x, float y)
 	);
 }
 */
-void FlipBookAnimation_Draw(int animation_id, float x, float y, const DirectX::XMFLOAT4& color)
+void FlipBookAnimation_Draw(int animation_id, float x, float y, const SpriteDrawParams& params)
 {
 	if (animation_id < 0 || animation_id >= ANIMATION_MAX) return;
 
 	const FlipBookAnimation& anim = g_Animations[animation_id];
-	if (anim.pattern_count_max == 0) return; // Slot is not in use
+	if (anim.pattern_count_max == 0) return;
 
-	// Work out which row and column the current pattern lives in
-	//   e.g. pattern 7 in a sheet with 5 columns = row 1, column 2
 	int col = anim.pattern_current_count % anim.pattern_column_count_max;
 	int row = anim.pattern_current_count / anim.pattern_column_count_max;
 
 	float texture_x = static_cast<float>(col * anim.pattern_width);
 	float texture_y = static_cast<float>(row * anim.pattern_height);
 
-	// Reuse the full-featured Sprite_Draw that takes a source rect
 	Sprite_Draw(
 		anim.texture_id,
 		x, y,
-		static_cast<float>(anim.pattern_width),   // draw width  = one pattern cell
-		static_cast<float>(anim.pattern_height),  // draw height = one pattern cell
+		static_cast<float>(anim.pattern_width),
+		static_cast<float>(anim.pattern_height),
 		texture_x, texture_y,
 		anim.pattern_width,
 		anim.pattern_height,
-		color
+		params                               
 	);
 }

@@ -1,52 +1,74 @@
-/*============================================================================
+ï»¿/*============================================================================
 Contents   :  [sprite.h]
-              
+
 Author     : Chin Qing You
-LastUpdate : 2026/06/15
+LastUpdate : 2026/06/22
 -----------------------------------------------------------------------------
 
 ============================================================================*/
 #ifndef SPRITE_H
 #define SPRITE_H
-
-#include <d3d11.h>
 #include <DirectXMath.h>
 
-
-bool Sprite_Initialize();
-void Sprite_Finalize();
+struct SpriteDrawParams
+{
+    DirectX::XMFLOAT3 color{ 1.0f, 1.0f, 1.0f }; // RGB tint  (1,1,1 = no tint)
+    float             alpha{ 1.0f };             // Opacity   (1 = fully opaque, 0 = invisible)
+    DirectX::XMFLOAT2 scale{ 1.0f, 1.0f };       // Size multiplier (1,1 = original size)
+    float             angle{ 0.0f };             // Rotation in radians (0 = no rotation)
+    bool              flip_x{ false };           // Mirror horizontally
+    bool              flip_y{ false };           // Mirror vertically
+};
 
 enum SpriteFilter
 {
-    kSpriteFilter_Point,
-    kSpriteFilter_Linear
+    kSpriteFilter_Point, 
+    kSpriteFilter_Linear,  
 };
 
 void Sprite_SetFilter(SpriteFilter filter);
 
-//D‚«‚ÈƒeƒNƒXƒ`ƒƒ‚ğD‚«‚ÈÀ•W‚É•`‰æ‚·‚é
-void Sprite_Draw(int texture_ID, float x, float y, const DirectX::XMFLOAT4& color = { 1.0f, 1.0f, 1.0f, 1.0f });
+bool Sprite_Initialize();
+void Sprite_Finalize();
 
-//D‚«‚ÈƒeƒNƒXƒ`ƒƒ‚ğD‚«‚ÈÀ•W‚ÆƒTƒCƒY‚É•`‰æ‚·‚é
-void Sprite_Draw(int texture_ID, float x, float y, float width, float height, const DirectX::XMFLOAT4& color = { 1.0f, 1.0f, 1.0f, 1.0f });
+// ----------------------------------------------------------------------------
+// Sprite_Draw overloads
+//
+// All overloads accept an optional SpriteDrawParams as the last argument.
+//
+//  (1)  Sprite_Draw(id, x, y)
+//         Draw at (x,y) at the texture's native size.
+//
+//  (2)  Sprite_Draw(id, x, y, w, h)
+//         Draw at (x,y) stretched to (w, h).
+//
+//  (3)  Sprite_Draw(id, x, y, w, h, tx, ty, tw, th)
+//         Draw a sub-region of the texture â€” use this for sprite sheets.
+//
+// Append a SpriteDrawParams to any of the above for tint / alpha / scale / rotation.
+// ----------------------------------------------------------------------------
 
-//D‚«‚ÈƒeƒNƒXƒ`ƒƒ‚ğD‚«‚ÈƒTƒCƒY‚ÅØ‚èæ‚Á‚ÄD‚«‚ÈÀ•W‚É•`‰æ‚·‚é
-void Sprite_Draw(int texture_ID, float x, float y, float texture_x, float texture_y, int texture_width, int texture_height, const DirectX::XMFLOAT4& color = { 1.0f, 1.0f, 1.0f, 1.0f });
+// (1) full texture
+void Sprite_Draw(int texture_id, float x, float y);
+void Sprite_Draw(int texture_id, float x, float y,
+    const SpriteDrawParams& params);
 
-//D‚«‚ÈƒeƒNƒXƒ`ƒƒ‚ğD‚«‚ÈƒTƒCƒY‚ÅØ‚èæ‚Á‚ÄD‚«‚ÈÀ•W‚ÉD‚«‚ÈƒTƒCƒY‚É•`‰æ‚·‚é
-void Sprite_Draw(int texture_ID, float x, float y, float width, float height, float texture_x, float texture_y, int texture_width, int texture_height, const DirectX::XMFLOAT4& color = { 1.0f, 1.0f, 1.0f, 1.0f });
+// (2) sized
+void Sprite_Draw(int texture_id, float x, float y,
+    float width, float height);
+void Sprite_Draw(int texture_id, float x, float y,
+    float width, float height,
+    const SpriteDrawParams& params);
 
-void Sprite_Draw(
-    int texture_ID,
-    float x, float y,
+// (3) sprite sheet
+void Sprite_Draw(int texture_id, float x, float y,
+    float width, float height,
+    float texture_x, float texture_y,
+    int texture_width, int texture_height);
+void Sprite_Draw(int texture_id, float x, float y,
     float width, float height,
     float texture_x, float texture_y,
     int texture_width, int texture_height,
-    float angle,
-    const DirectX::XMFLOAT2& scale = { 1.0f, 1.0f},
-    const DirectX::XMFLOAT4& color = { 1.0f, 1.0f, 1.0f, 1.0f }
-);
-
-
+    const SpriteDrawParams& params);
 
 #endif
