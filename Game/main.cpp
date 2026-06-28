@@ -170,6 +170,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		{
 			SendMessage(hWnd, WM_CLOSE, 0, 0); // WM_CLOSEメッセージの送信
 		}
+		[[fallthrough]];
     case WM_SYSKEYDOWN:
     case WM_KEYUP:
     case WM_SYSKEYUP:
