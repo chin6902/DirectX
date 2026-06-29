@@ -85,6 +85,9 @@
     <ClCompile Include="game_player.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="game_playerBullet.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="debug_ostream.h">
@@ -154,6 +157,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="game_player.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="game_playerBullet.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -156,6 +156,7 @@
     <ClCompile Include="food.cpp" />
     <ClCompile Include="game.cpp" />
     <ClCompile Include="game_player.cpp" />
+    <ClCompile Include="game_playerBullet.cpp" />
     <ClCompile Include="input_keyboard.cpp" />
     <ClCompile Include="input_mouse.cpp" />
     <ClCompile Include="input_xinput.cpp" />
@@ -182,6 +183,7 @@
     <ClInclude Include="food.h" />
     <ClInclude Include="game.h" />
     <ClInclude Include="game_player.h" />
+    <ClInclude Include="game_playerBullet.h" />
     <ClInclude Include="input_keyboard.h" />
     <ClInclude Include="input_mouse.h" />
     <ClInclude Include="input_xinput.h" />
