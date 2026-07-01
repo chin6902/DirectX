@@ -128,8 +128,7 @@ void Sprite_Finalize()
 
 void Sprite_SetFilter(SpriteFilter filter)
 {
-    ID3D11SamplerState* sampler =
-        (filter == kSpriteFilter_Linear) ? g_pSamplerState_Linear : g_pSamplerState_Point;
+    ID3D11SamplerState* sampler = (filter == kSpriteFilter_Linear) ? g_pSamplerState_Linear : g_pSamplerState_Point;
     Direct3D_GetDeviceContext()->PSSetSamplers(0, 1, &sampler);
 }
 

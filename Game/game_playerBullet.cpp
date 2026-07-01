@@ -14,7 +14,7 @@ LastUpdate : 2026/06/29
 static int g_bullet_texture_ID = -1;
 static constexpr int   BULLET_CELL_W = 197;
 static constexpr int   BULLET_CELL_H = 148;
-static constexpr int   BULLET_CELL_OFFSET_Y = 20;                        
+static constexpr int   BULLET_CELL_OFFSET_Y = 5;                        
 static constexpr int   BULLET_CONTENT_H = BULLET_CELL_H - BULLET_CELL_OFFSET_Y * 2; 
 static constexpr int   BULLET_FRAME_MAX = 4;
 static constexpr int   BULLET_COLS = 1;
@@ -97,9 +97,8 @@ void GamePlayerBullet_Draw()
 	{
 		const Bullet& b = g_Bullets[i];
 
-		// Sheet is 1 column wide so col is always 0; row = frame index
-		int col = b.anim_frame % BULLET_COLS;   // always 0
-		int row = b.anim_frame / BULLET_COLS;   // 0, 1, 2, 3
+		int col = b.anim_frame % BULLET_COLS; 
+		int row = b.anim_frame / BULLET_COLS;
 
 		float tex_x = static_cast<float>(col * BULLET_CELL_W);
 		float tex_y = static_cast<float>(row * BULLET_CELL_H);
@@ -112,6 +111,19 @@ void GamePlayerBullet_Draw()
 			BULLET_CELL_W, BULLET_CELL_H
 		);
 	}
+}
+
+CollisionCircle GamePlayerBullet_GetCollisionCircle(int bulletIndex)
+{
+	return
+	{
+		{
+			g_Bullets[bulletIndex].posX + BULLET_WIDTH * 0.5f,
+			g_Bullets[bulletIndex].posY + BULLET_HEIGHT * 0.5f,
+		},
+
+		BULLET_HEIGHT * 0.5f
+	};
 }
 
 

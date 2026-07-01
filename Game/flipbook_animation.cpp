@@ -6,9 +6,10 @@ LastUpdate : 2026/06/22
 -----------------------------------------------------------------------------
 
 ============================================================================*/
+#include <algorithm>  
+
 #include "flipbook_animation.h"
 #include "sprite.h"
-#include <algorithm>  // std::clamp
 
 struct FlipBookAnimation
 {
@@ -33,9 +34,6 @@ struct FlipBookAnimation
 static constexpr int ANIMATION_MAX{ 128 };
 static FlipBookAnimation g_Animations[ANIMATION_MAX]{};
 
-// ============================================================================
-// Initialize / Finalize
-// ============================================================================
 void FlipBookAnimation_Initialize()
 {
     for (FlipBookAnimation& a : g_Animations)
@@ -45,11 +43,10 @@ void FlipBookAnimation_Initialize()
 }
 
 void FlipBookAnimation_Finalize()
-{}
+{
 
-// ============================================================================
-// Create
-// ============================================================================
+}
+
 int FlipBookAnimation_Create(
     int   texture_id,
     int   pattern_width,
@@ -60,7 +57,10 @@ int FlipBookAnimation_Create(
 {
     for (int i = 0; i < ANIMATION_MAX; i++)
     {
-        if (g_Animations[i].pattern_count_max != 0) continue;
+        if (g_Animations[i].pattern_count_max != 0)
+        {
+            continue;
+        }
 
         g_Animations[i].texture_id = texture_id;
         g_Animations[i].pattern_width = pattern_width;
@@ -87,7 +87,11 @@ int FlipBookAnimation_Create(
 // ============================================================================
 void FlipBookAnimation_Destroy(int animation_id)
 {
-    if (animation_id < 0 || animation_id >= ANIMATION_MAX) return;
+    if (animation_id < 0 || animation_id >= ANIMATION_MAX)
+    {
+        return;
+    }
+
     g_Animations[animation_id].pattern_count_max = 0;
 }
 
@@ -103,9 +107,15 @@ void FlipBookAnimation_Destroy(int animation_id)
 // ============================================================================
 void FlipBookAnimation_SetRange(int animation_id, int frame_start, int frame_end)
 {
-    if (animation_id < 0 || animation_id >= ANIMATION_MAX) return;
+    if (animation_id < 0 || animation_id >= ANIMATION_MAX)
+    {
+        return;
+    }
     FlipBookAnimation& a = g_Animations[animation_id];
-    if (a.pattern_count_max == 0) return;
+    if (a.pattern_count_max == 0)
+    {
+        return;
+    }
 
     int max_frame = a.pattern_count_max - 1;
     a.frame_start = std::clamp(frame_start, 0, max_frame);
@@ -131,9 +141,15 @@ void FlipBookAnimation_SetRange(int animation_id, int frame_start, int frame_end
 // ============================================================================
 void FlipBookAnimation_SetMode(int animation_id, AnimPlayMode mode)
 {
-    if (animation_id < 0 || animation_id >= ANIMATION_MAX) return;
+    if (animation_id < 0 || animation_id >= ANIMATION_MAX)
+    {
+        return;
+    }
     FlipBookAnimation& a = g_Animations[animation_id];
-    if (a.pattern_count_max == 0) return;
+    if (a.pattern_count_max == 0) 
+    {
+        return;
+    }
 
     a.mode = mode;
     a.is_finished = false;
@@ -153,9 +169,15 @@ void FlipBookAnimation_SetMode(int animation_id, AnimPlayMode mode)
 // ============================================================================
 void FlipBookAnimation_SetFrame(int animation_id, int frame)
 {
-    if (animation_id < 0 || animation_id >= ANIMATION_MAX) return;
+    if (animation_id < 0 || animation_id >= ANIMATION_MAX)
+    {
+        return;
+    }
     FlipBookAnimation& a = g_Animations[animation_id];
-    if (a.pattern_count_max == 0) return;
+    if (a.pattern_count_max == 0)
+    {
+        return;
+    }   
 
     a.pattern_current_count = std::clamp(frame, 0, a.pattern_count_max - 1);
     a.pattern_accumulated_time = 0.0f;
@@ -176,24 +198,37 @@ void FlipBookAnimation_SetFrame(int animation_id, int frame)
 // ============================================================================
 bool FlipBookAnimation_IsFinished(int animation_id)
 {
-    if (animation_id < 0 || animation_id >= ANIMATION_MAX) return false;
+    if (animation_id < 0 || animation_id >= ANIMATION_MAX)
+    {
+        return false;
+    }
+
     return g_Animations[animation_id].is_finished;
 }
 
-// ============================================================================
-// Update — call once per frame
-// ============================================================================
 void FlipBookAnimation_Update(float delta_time)
 {
     for (int i = 0; i < ANIMATION_MAX; i++)
     {
         FlipBookAnimation& a = g_Animations[i];
-        if (a.pattern_count_max == 0)  continue;  // slot unused
-        if (a.mode == AnimPlayMode::FREEZE) continue;  // held — do nothing
-        if (a.is_finished)              continue;  // ONE_SHOT done — do nothing
+        if (a.pattern_count_max == 0)
+        { 
+            continue; 
+        }
+        if (a.mode == AnimPlayMode::FREEZE) 
+        { 
+            continue;
+        }
+        if (a.is_finished)            
+        { 
+            continue; 
+        }
 
         a.pattern_accumulated_time += delta_time;
-        if (a.pattern_accumulated_time < a.pattern_update_time) continue;
+        if (a.pattern_accumulated_time < a.pattern_update_time) 
+        { 
+            continue; 
+        }
 
         a.pattern_accumulated_time -= a.pattern_update_time;
         a.pattern_current_count++;
@@ -233,10 +268,16 @@ void FlipBookAnimation_Draw(int animation_id, float x, float y)
 
 void FlipBookAnimation_Draw(int animation_id, float x, float y, const SpriteDrawParams& params)
 {
-    if (animation_id < 0 || animation_id >= ANIMATION_MAX) return;
+    if (animation_id < 0 || animation_id >= ANIMATION_MAX)
+    {
+        return;
+    }
 
     const FlipBookAnimation& anim = g_Animations[animation_id];
-    if (anim.pattern_count_max == 0) return;
+    if (anim.pattern_count_max == 0)
+    {
+        return;
+    }
 
     int col = anim.pattern_current_count % anim.pattern_column_count_max;
     int row = anim.pattern_current_count / anim.pattern_column_count_max;

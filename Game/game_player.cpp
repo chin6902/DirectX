@@ -25,14 +25,14 @@ static float g_player_height = 64.0f;
 //player position
 static float g_playerX = 0.0f;
 static float g_playerY = 0.0f;
-static float g_playerOffsetX = 0.0f;
+static float g_playerOffsetX = 30.0f;
 static float g_playerOffsetY = 0.0f;
-static float g_playerSpeed = 200.0f;
+static float g_playerSpeed = 300.0f;
 
 void GamePlayer_Initialize(float startX, float startY)
 {				
 	//プレイヤーのテクスチャを読み込む
-	g_player_texture_ID = Texture_Load(L"assets/textures/Player - Copy.png");
+	g_player_texture_ID = Texture_Load(L"assets/textures/player.png");
 	g_playerX = startX;
 	g_playerY = startY;
 }
@@ -97,8 +97,6 @@ void GamePlayer_Update(float delta_time)
 void GamePlayer_Draw()
 {
 	//座標にプレイヤーを描画する
-	Sprite_SetFilter(kSpriteFilter_Linear);
-
 	Sprite_Draw(g_player_texture_ID, g_playerX, g_playerY, g_player_width, g_player_height);		
 }
 
