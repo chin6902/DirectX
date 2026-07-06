@@ -12,6 +12,7 @@ LastUpdate : 2026/06/15
 #include "texture.h"
 #include "sprite.h"
 #include "game.h"
+#include "flipbook_animation.h"
 
 #include "input_keyboard.h"
 #include "input_mouse.h"
@@ -34,6 +35,7 @@ bool Application_Initialize(HWND hWnd)
 
 	Shader_Initialize(Direct3D_GetDevice(), Direct3D_GetDeviceContext());
 	Sprite_Initialize();
+	FlipBookAnimation_Initialize();
 
 	Game_Initialize();
 
@@ -45,6 +47,7 @@ void Application_Finalize()
 	// 各システムの終了処理
 	Game_Finalize();
 
+	FlipBookAnimation_Finalize();
 	Sprite_Finalize();
 	Texture_Finalize();
 	Shader_Finalize();

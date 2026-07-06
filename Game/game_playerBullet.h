@@ -19,6 +19,10 @@ void GamePlayerBullet_Draw();
 
 void GamePlayerBullet_Create(float startX, float startY);
 
+int GamePlayerBullet_GetActiveCount();
+void GamePlayerBullet_Destroy(int bulletIndex);
+void GamePlayerBullet_CleanUp();
+
 CollisionCircle GamePlayerBullet_GetCollisionCircle(int bulletIndex);
 
 #endif

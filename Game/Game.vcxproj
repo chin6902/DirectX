@@ -149,8 +149,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="application.cpp" />
+    <ClCompile Include="game_impact.cpp" />
     <ClCompile Include="coin.cpp" />
     <ClCompile Include="collision.cpp" />
+    <ClCompile Include="collision_debug.cpp" />
     <ClCompile Include="debug_text.cpp" />
     <ClCompile Include="direct3d.cpp" />
     <ClCompile Include="enemy_spawner.cpp" />
@@ -167,7 +169,6 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="mouse.cpp" />
     <ClCompile Include="polygon.cpp" />
-    <ClCompile Include="runner.cpp" />
     <ClCompile Include="shader.cpp" />
     <ClCompile Include="sprite.cpp" />
     <ClCompile Include="system_timer.cpp" />
@@ -177,8 +178,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="application.h" />
+    <ClInclude Include="game_impact.h" />
     <ClInclude Include="coin.h" />
     <ClInclude Include="collision.h" />
+    <ClInclude Include="collision_debug.h" />
     <ClInclude Include="config.h" />
     <ClInclude Include="debug_ostream.h" />
     <ClInclude Include="debug_text.h" />
@@ -196,7 +199,6 @@
     <ClInclude Include="keyboard.h" />
     <ClInclude Include="mouse.h" />
     <ClInclude Include="polygon.h" />
-    <ClInclude Include="runner.h" />
     <ClInclude Include="shader.h" />
     <ClInclude Include="sprite.h" />
     <ClInclude Include="system_timer.h" />

@@ -73,9 +73,6 @@
     <ClCompile Include="game.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="runner.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="coin.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -95,6 +92,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="collision.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="collision_debug.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="game_impact.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -156,9 +159,6 @@
     <ClInclude Include="game.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="runner.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="coin.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -178,6 +178,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="collision.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="collision_debug.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="game_impact.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

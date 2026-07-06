@@ -154,6 +154,6 @@ void Coin_Draw(float camera_x)
 
         SpriteDrawParams p;
         p.scale = { coin.scale, coin.scale };
-        FlipBookAnimation_Draw(g_AnimId, screen_x, coin.y, p);
+        FlipBookAnimation_Draw(g_AnimId, screen_x, coin.y, draw_size, draw_size, p);
     }
 }

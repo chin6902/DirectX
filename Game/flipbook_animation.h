@@ -70,5 +70,5 @@ bool FlipBookAnimation_IsFinished(int animation_id);
 
 void FlipBookAnimation_Update(float delta_time);
 
-void FlipBookAnimation_Draw(int animation_id, float x, float y);
-void FlipBookAnimation_Draw(int animation_id, float x, float y, const SpriteDrawParams& params);
+void FlipBookAnimation_Draw(int animation_id, float x, float y , float width, float height);
+void FlipBookAnimation_Draw(int animation_id, float x, float y, float width, float height, const SpriteDrawParams& params);

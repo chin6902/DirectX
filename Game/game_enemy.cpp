@@ -13,6 +13,9 @@ LastUpdate : 2026/06/29
 #include "config.h"
 #include "texture.h"
 #include "sprite.h"
+#include "collision.h"
+#include "collision_debug.h"
+#include "game_impact.h"
 
 struct EnemySpriteInfo
 {
@@ -20,6 +23,8 @@ struct EnemySpriteInfo
 	float width;
 	float height;
 	const wchar_t* textureName;
+	CollisionCircle collisionCircle;
+	ExplosionType explosionType;
 };
 
 enum EnemyState
@@ -35,6 +40,7 @@ struct Enemy
 	float posX;
 	float posY;
 	float phaseOffset; 
+
 	EnemyType type;
 	EnemyState state;
 
@@ -48,14 +54,18 @@ static const EnemySpriteInfo g_EnemySpriteData[2] =
 		.textureID = -1, 
 		.width = 96.0f,
 		.height = 64.0f,
-		.textureName = L"assets/textures/Enemy.png"
+		.textureName = L"assets/textures/Enemy.png",
+		.collisionCircle = { { 48.0f, 32.0f }, 32.0f }, // Center at (48,32) with radius 32 //modify so that it can be calculated automatically based on width and height
+		.explosionType = ExplosionType_Large,
 	},
 	// EnemyType_Fast
 	{
 		.textureID = -1, 
 		.width = 64.0f,
 		.height = 48.0f,
-		.textureName = L"assets/textures/Enemy_type2.png"
+		.textureName = L"assets/textures/Enemy_type2.png",
+		.collisionCircle = { { 32.0f, 24.0f }, 24.0f }, // Center at (32,24) with radius 24
+		.explosionType = ExplosionType_Small,
 	}
 };
 
@@ -127,16 +137,6 @@ void GameEnemy_Update(float delta_time)
 			break;
 		}
 	}
-
-	// Remove enemies that have gone off screen
-	for (int i = g_EnemyCount - 1; i >= 0; --i)
-	{
-		if (g_Enemies[i].isDead)
-		{
-			g_Enemies[i] = g_Enemies[g_EnemyCount - 1];
-			g_EnemyCount--;
-		}
-	}
 }
 
 void GameEnemy_Draw()
@@ -156,6 +156,14 @@ void GameEnemy_Draw()
 			p
 		);
 	}
+
+#ifdef _DEBUG
+	for (int i = 0; i < g_EnemyCount; i++)
+	{
+		CollisionCircle cc = GameEnemy_GetCollisionCircle(i);
+		Collision_Debug_Draw(cc, { 1.0f, 1.0f, 0.0f });
+	}
+#endif
 }
 
 void NormalMovement(Enemy& e, float delta_time)
@@ -196,6 +204,59 @@ void FastMovement(Enemy& e, float delta_time)
 		}
 		break;
 	}
+}
+
+ExplosionType GameEnemy_GetExplosionType(int enemyIndex)
+{
+	if (enemyIndex < 0 || enemyIndex >= g_EnemyCount)
+	{
+		return ExplosionType_Large;   // safe fallback
+	}
+
+	return g_EnemySpriteInfo[g_Enemies[enemyIndex].type].explosionType;
+}
+
+int GameEnemy_GetActiveCount()
+{
+	return g_EnemyCount;
+}
+
+void GameEnemy_Destroy(int enemyIndex)
+{
+	if (enemyIndex < 0 || enemyIndex >= g_EnemyCount)
+	{
+		return;
+	}
+
+	g_Enemies[enemyIndex].isDead = true;
+}
+
+void GameEnemy_CleanUp()
+{
+	for (int i = g_EnemyCount - 1; i >= 0; --i)
+	{
+		if (g_Enemies[i].isDead)
+		{
+			g_Enemies[i] = g_Enemies[g_EnemyCount - 1];
+			g_EnemyCount--;
+		}
+	}
+}
+
+CollisionCircle GameEnemy_GetCollisionCircle(int enemyIndex)
+{
+	//if not debug build do not check for index out of bounds(+ points)
+	if (enemyIndex < 0 || enemyIndex >= g_EnemyCount)
+	{
+		return { {0.0f, 0.0f}, 0.0f }; // Return an empty circle if index is invalid
+	}
+
+	CollisionCircle cc = g_EnemySpriteInfo[g_Enemies[enemyIndex].type].collisionCircle;
+
+	cc.position.x += g_Enemies[enemyIndex].posX;
+	cc.position.y += g_Enemies[enemyIndex].posY;
+
+	return cc;
 }
 
 

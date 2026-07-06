@@ -4,7 +4,7 @@ Contents   :  [flipbook_animation.cpp]
 Author     : Chin Qing You
 LastUpdate : 2026/06/22
 -----------------------------------------------------------------------------
-
+seperate animation data and frame data
 ============================================================================*/
 #include <algorithm>  
 
@@ -261,12 +261,12 @@ void FlipBookAnimation_Update(float delta_time)
 // ============================================================================
 // Draw
 // ============================================================================
-void FlipBookAnimation_Draw(int animation_id, float x, float y)
+void FlipBookAnimation_Draw(int animation_id, float x, float y, float width, float height)
 {
-    FlipBookAnimation_Draw(animation_id, x, y, SpriteDrawParams{});
+    FlipBookAnimation_Draw(animation_id, x, y, width, height, SpriteDrawParams{});
 }
 
-void FlipBookAnimation_Draw(int animation_id, float x, float y, const SpriteDrawParams& params)
+void FlipBookAnimation_Draw(int animation_id, float x, float y, float width, float height,const SpriteDrawParams& params)
 {
     if (animation_id < 0 || animation_id >= ANIMATION_MAX)
     {
@@ -288,8 +288,7 @@ void FlipBookAnimation_Draw(int animation_id, float x, float y, const SpriteDraw
     Sprite_Draw(
         anim.texture_id,
         x, y,
-        static_cast<float>(anim.pattern_width),
-        static_cast<float>(anim.pattern_height),
+        width, height,
         texture_x, texture_y,
         anim.pattern_width,
         anim.pattern_height,

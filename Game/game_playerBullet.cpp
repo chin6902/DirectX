@@ -10,6 +10,8 @@ LastUpdate : 2026/06/29
 #include "config.h"
 #include "texture.h"
 #include "sprite.h"
+#include "collision.h"
+#include "collision_debug.h"
 
 static int g_bullet_texture_ID = -1;
 static constexpr int   BULLET_CELL_W = 197;
@@ -26,6 +28,7 @@ struct Bullet
 	float posY;
 	int anim_frame;
 	float anim_timer;
+	bool isDestroy;
 };
 
 static constexpr int MAX_BULLETS = 100;
@@ -58,6 +61,7 @@ void GamePlayerBullet_Create(float startX, float startY)
 	r.posY = startY - BULLET_HEIGHT * 0.5f;
 	r.anim_frame = 0;
 	r.anim_timer = 0.0f;
+	r.isDestroy = false;
 	g_BulletFireCount++;
 }
 
@@ -78,15 +82,11 @@ void GamePlayerBullet_Update(float delta_time)
 			b.anim_timer -= BULLET_FRAME_TIME;
 			b.anim_frame = (b.anim_frame + 1) % BULLET_FRAME_MAX;
 		}
-	}
 
-	// Remove bullets that have gone off-screen
-	for (int i = g_BulletFireCount - 1; i >= 0; --i)
-	{
-		if (g_Bullets[i].posX > SCREEN_WIDTH) 
+		// Bullet destruction if it goes off screen
+		if (g_Bullets[i].posX > SCREEN_WIDTH)
 		{
-			g_Bullets[i] = g_Bullets[g_BulletFireCount - 1];
-			g_BulletFireCount--;
+			g_Bullets[i].isDestroy = true;
 		}
 	}
 }
@@ -111,18 +111,58 @@ void GamePlayerBullet_Draw()
 			BULLET_CELL_W, BULLET_CELL_H
 		);
 	}
+
+#ifdef _DEBUG
+	for (int i = 0; i < g_BulletFireCount; i++)
+	{
+		CollisionCircle cc = GamePlayerBullet_GetCollisionCircle(i);
+		Collision_Debug_Draw(cc, { 1.0f, 0.0f, 0.0f });
+	}
+#endif
+}
+
+int GamePlayerBullet_GetActiveCount()
+{
+	return g_BulletFireCount;
+}
+
+void GamePlayerBullet_Destroy(int bulletIndex)
+{
+	if (bulletIndex < 0 || bulletIndex >= g_BulletFireCount)
+	{
+		return;
+	}
+
+	g_Bullets[bulletIndex].isDestroy = true;
+}
+
+void GamePlayerBullet_CleanUp()
+{
+	for (int i = g_BulletFireCount - 1; i >= 0; --i)
+	{
+		if (g_Bullets[i].isDestroy)
+		{
+			g_Bullets[i] = g_Bullets[g_BulletFireCount - 1];
+			g_BulletFireCount--;
+		}
+	}
 }
 
 CollisionCircle GamePlayerBullet_GetCollisionCircle(int bulletIndex)
 {
+	if (bulletIndex < 0 || bulletIndex >= MAX_BULLETS)
+	{
+		return { {0.0f, 0.0f }, 0.0f };
+	}
+	
 	return
 	{
 		{
-			g_Bullets[bulletIndex].posX + BULLET_WIDTH * 0.5f,
+			g_Bullets[bulletIndex].posX + BULLET_WIDTH * 0.8f,
 			g_Bullets[bulletIndex].posY + BULLET_HEIGHT * 0.5f,
 		},
 
-		BULLET_HEIGHT * 0.5f
+		BULLET_HEIGHT * 0.3f
 	};
 }
 
