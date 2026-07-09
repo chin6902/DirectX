@@ -6,11 +6,14 @@ LastUpdate : 2026/06/24
 -----------------------------------------------------------------------------
 
 ============================================================================*/
-#include "game.h"
+#include "Audio.h"
 #include "input_keyboard.h"
 #include "texture.h"
 #include "sprite.h"
 #include "config.h"
+#include "flipbook_animation.h"
+
+#include "game.h"
 #include "game_player.h"
 #include "game_playerBullet.h"
 #include "enemy_spawner.h"
@@ -18,9 +21,8 @@ LastUpdate : 2026/06/24
 #include "collision.h"
 #include "collision_debug.h"
 #include "game_impact.h"
-#include "flipbook_animation.h"
 #include "game_score.h"
-#include "Audio.h"
+#include "scene.h"
 
 enum State
 {
@@ -38,6 +40,8 @@ static int g_BgmId = -1;
 constexpr float startX = 50.0f;
 constexpr float startY = (SCREEN_HEIGHT - 64.0f) * 0.5f;
 static int g_score = 0;
+
+int debug_result = 0;
 
 void Collision_CheckPlayerBulletsVsEnemies();
 
@@ -105,6 +109,13 @@ void Game_Update(float delta_time)
 
 	case STATE_PAUSE:
 		break;
+	}
+
+	debug_result = g_score;
+
+	if (debug_result == 100)
+	{
+		Scene_SetNextScene(SCENE_RESULT);
 	}
 }
 

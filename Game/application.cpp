@@ -11,8 +11,8 @@ LastUpdate : 2026/06/15
 #include "shader.h"
 #include "texture.h"
 #include "sprite.h"
-#include "game.h"
 #include "flipbook_animation.h"
+#include "scene.h"
 
 #include "input_keyboard.h"
 #include "input_mouse.h"
@@ -40,7 +40,7 @@ bool Application_Initialize(HWND hWnd)
 	Sprite_Initialize();
 	FlipBookAnimation_Initialize();
 
-	Game_Initialize();
+	Scene_Initialize();
 
 	return true;
 }
@@ -48,7 +48,7 @@ bool Application_Initialize(HWND hWnd)
 void Application_Finalize()
 {
 	// 各システムの終了処理
-	Game_Finalize();
+	Scene_Finalize();
 
 	FlipBookAnimation_Finalize();
 	Sprite_Finalize();
@@ -62,6 +62,8 @@ void Application_Finalize()
 
 void Application_Update(float delta_time)
 {
+	Scene_Change();
+
 	// ゲームの更新処理
 	InputKeyboard_Update(delta_time);
 	InputMouse_Update();
@@ -71,16 +73,15 @@ void Application_Update(float delta_time)
 		g_mouseY = InputMouse_GetY();
 	*/
 
-	Game_Update(delta_time);
+	Scene_Update(delta_time);
 }
 
 void Application_FixedUpdate()
 {
-
 }
 
 void Application_Draw()
 {
-	Game_Draw();
+	Scene_Draw();
 }
 
