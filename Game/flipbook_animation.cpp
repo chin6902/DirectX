@@ -1,4 +1,4 @@
-/*============================================================================
+﻿/*============================================================================
 Contents   :  [flipbook_animation.cpp]
 
 Author     : Chin Qing You
@@ -82,9 +82,6 @@ int FlipBookAnimation_Create(
     return -1;
 }
 
-// ============================================================================
-// Destroy
-// ============================================================================
 void FlipBookAnimation_Destroy(int animation_id)
 {
     if (animation_id < 0 || animation_id >= ANIMATION_MAX)
@@ -215,16 +212,19 @@ void FlipBookAnimation_Update(float delta_time)
         { 
             continue; 
         }
+
         if (a.mode == AnimPlayMode::FREEZE) 
         { 
             continue;
         }
+
         if (a.is_finished)            
         { 
             continue; 
         }
 
         a.pattern_accumulated_time += delta_time;
+
         if (a.pattern_accumulated_time < a.pattern_update_time) 
         { 
             continue; 

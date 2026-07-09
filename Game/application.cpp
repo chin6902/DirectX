@@ -17,6 +17,7 @@ LastUpdate : 2026/06/15
 #include "input_keyboard.h"
 #include "input_mouse.h"
 #include "input_xinput.h"
+#include "Audio.h"
 
 static int g_mouseX = 0;
 static int g_mouseY = 0;
@@ -27,6 +28,8 @@ bool Application_Initialize(HWND hWnd)
 	{
 		return false;
 	}
+
+	InitAudio();
 
 	// 各システムの初期化
 	InputKeyboard_Initialize();
@@ -53,7 +56,7 @@ void Application_Finalize()
 	Shader_Finalize();
 
 	InputMouse_Finalize();
-
+	UninitAudio();
 	Direct3DFinalize();
 }
 

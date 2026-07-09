@@ -245,10 +245,9 @@ void GameEnemy_CleanUp()
 
 CollisionCircle GameEnemy_GetCollisionCircle(int enemyIndex)
 {
-	//if not debug build do not check for index out of bounds(+ points)
 	if (enemyIndex < 0 || enemyIndex >= g_EnemyCount)
 	{
-		return { {0.0f, 0.0f}, 0.0f }; // Return an empty circle if index is invalid
+		return { {0.0f, 0.0f}, 0.0f }; 
 	}
 
 	CollisionCircle cc = g_EnemySpriteInfo[g_Enemies[enemyIndex].type].collisionCircle;

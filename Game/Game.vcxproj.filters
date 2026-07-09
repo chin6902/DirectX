@@ -73,12 +73,6 @@
     <ClCompile Include="game.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="coin.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="food.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="game_player.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -98,6 +92,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="game_impact.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="game_score.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Audio.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -159,12 +159,6 @@
     <ClInclude Include="game.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="coin.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="food.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="game_player.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -184,6 +178,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="game_impact.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="game_score.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Audio.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

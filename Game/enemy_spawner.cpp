@@ -16,7 +16,7 @@ static float SpawnX = SCREEN_WIDTH + 50.0f;
 
 static void SpawnEnemy();
 static float timer = 0.0f;
-static constexpr float spawn_interval = 1.0f; // Spawn an enemy every 1 second
+static constexpr float spawn_interval = 2.0f; 
 
 void EnemySpawner_Initialize()
 {

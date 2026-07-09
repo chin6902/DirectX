@@ -9,16 +9,12 @@ LastUpdate : 2026/07/06
 #include "texture.h"
 #include "game_impact.h"
 #include "flipbook_animation.h"
+#include "Audio.h"
 
-// ============================================================================
-// ExplosionInfo — static, per-TYPE definition.
-// One entry per ExplosionType, shared by every instance of that type.
-// Filled in once by Create(), never changes at runtime.
-// ============================================================================
 struct ExplosionInfo
 {
     const wchar_t* texture_filename;
-    int   texture_id;      // filled in during Create()
+    int   texture_id;      
     int   cell_width;
     int   cell_height;
     int   frame_count;
@@ -31,21 +27,15 @@ struct ExplosionInfo
 
 static constexpr int ExplosionType_Count = 2;
 
-// TODO: confirm real cell_width/cell_height against the actual texture file —
-// 427x240 doesn't divide evenly into a 4x2 grid, so these are placeholders.
 static ExplosionInfo g_ExplosionInfo[ExplosionType_Count] =
 {
-    // ExplosionType_Large (explosion.png) — 4 cols x 2 rows, 8 frames
+	// ExplosionType_Large
     { L"assets/textures/explosion.png", -1, 106, 120, 8, 4, 0.08f, 0, 7 , 1.0f },
+
+	// ExplosionType_Small
     { L"assets/textures/explosion.png", -1, 106, 120, 8, 4, 0.08f, 0, 7 , 0.5f },
 };
 
-// ============================================================================
-// ExplosionData — per-INSTANCE runtime state.
-// One entry per active/inactive slot. Tracks where a specific playing
-// instance is and which FlipBookAnimation it owns.
-// anim_id is set once by Create(); is_active/x/y are reset by Initialize().
-// ============================================================================
 struct ExplosionData
 {
     int   anim_id;
@@ -54,14 +44,12 @@ struct ExplosionData
     bool  is_active;
 };
 
+static int g_explosionSoundID = -1;
+
 static constexpr int IMPACT_MAX_PER_TYPE{ 32 };
 static ExplosionData g_ExplosionData[ExplosionType_Count][IMPACT_MAX_PER_TYPE]{};
 
-// ============================================================================
-// Create — sets up resources: loads each type's texture and creates one
-// FlipBookAnimation instance per slot. Call this once, at program startup.
-// ============================================================================
-void Game_Impact_Create()
+void GameImpact_Create()
 {
     for (int type = 0; type < ExplosionType_Count; type++)
     {
@@ -85,12 +73,7 @@ void Game_Impact_Create()
     }
 }
 
-// ============================================================================
-// Initialize — resets per-instance runtime state only (is_active, position).
-// Does NOT touch anim_id, textures, or FlipBookAnimation instances — those
-// come from Create(). Safe to call again on a level/game restart.
-// ============================================================================
-void Game_Impact_Initialize()
+void GameImpact_Initialize()
 {
     for (int type = 0; type < ExplosionType_Count; type++)
     {
@@ -101,9 +84,11 @@ void Game_Impact_Initialize()
             data.is_active = false;
         }
     }
+
+    g_explosionSoundID = LoadAudio("assets/sounds/explosion.wav");
 }
 
-void Game_Impact_Finalize()
+void GameImpact_Finalize()
 {
     for (int type = 0; type < ExplosionType_Count; type++)
     {
@@ -117,9 +102,11 @@ void Game_Impact_Finalize()
         Texture_Release(g_ExplosionInfo[type].texture_id);
         g_ExplosionInfo[type].texture_id = -1;
     }
+
+	UnloadAudio(g_explosionSoundID);
 }
 
-void Game_Impact_Trigger(ExplosionType type, float x, float y)
+void GameImpact_Trigger(ExplosionType type, float x, float y)
 {
     const ExplosionInfo& info = g_ExplosionInfo[type];
 
@@ -136,13 +123,12 @@ void Game_Impact_Trigger(ExplosionType type, float x, float y)
         data.x = x;
         data.y = y;
         data.is_active = true;
+        PlayAudio(g_explosionSoundID);
         return;
     }
-
-    // All slots of this type busy — impact silently dropped.
 }
 
-void Game_Impact_Update(float delta_time)
+void GameImpact_Update(float delta_time)
 {
     for (int type = 0; type < ExplosionType_Count; type++)
     {
@@ -161,7 +147,7 @@ void Game_Impact_Update(float delta_time)
     }
 }
 
-void Game_Impact_Draw()
+void GameImpact_Draw()
 {
     for (int type = 0; type < ExplosionType_Count; type++)
     {

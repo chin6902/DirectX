@@ -15,12 +15,12 @@ enum ExplosionType
 	ExplosionType_Small,
 };
 
-void Game_Impact_Create();
-void Game_Impact_Initialize();
-void Game_Impact_Finalize();
-void Game_Impact_Trigger(ExplosionType type, float x, float y);
-void Game_Impact_Update(float delta_time);
-void Game_Impact_Draw();
+void GameImpact_Create();
+void GameImpact_Initialize();
+void GameImpact_Finalize();
+void GameImpact_Trigger(ExplosionType type, float x, float y);
+void GameImpact_Update(float delta_time);
+void GameImpact_Draw();
 
 #endif
 

@@ -7,6 +7,7 @@ LastUpdate : 2026/06/24
 
 ============================================================================*/
 #include "game.h"
+#include "input_keyboard.h"
 #include "texture.h"
 #include "sprite.h"
 #include "config.h"
@@ -18,30 +19,45 @@ LastUpdate : 2026/06/24
 #include "collision_debug.h"
 #include "game_impact.h"
 #include "flipbook_animation.h"
+#include "game_score.h"
+#include "Audio.h"
 
 enum State
 {
-	
+	STATE_PLAYING,
+	STATE_PAUSE,
+	STATE_GAMEOVER,
+	STATE_GAMECLEAR,
 };
 
+static State g_gameState = STATE_PLAYING;
+
 static int g_TextureId_Bg = TEXTURE_INVALID_ID;
+static int g_BgmId = -1;
 
 constexpr float startX = 50.0f;
 constexpr float startY = (SCREEN_HEIGHT - 64.0f) * 0.5f;
+static int g_score = 0;
 
 void Collision_CheckPlayerBulletsVsEnemies();
 
 void Game_Initialize()
 {
+	g_gameState = STATE_PLAYING;
 
 	g_TextureId_Bg = Texture_Load(L"assets/textures/Background.png", false);
+	g_BgmId = LoadAudio("assets/sounds/bgm.wav");
+	g_score = 0;
 
     GamePlayer_Initialize(startX, startY);
     GamePlayerBullet_Initialize();
 	EnemySpawner_Initialize();
 	GameEnemy_Initialize();
-	Game_Impact_Create();
-	Game_Impact_Initialize();
+	GameImpact_Create();
+	GameImpact_Initialize();
+	GameScore_Initialize(6); // Initialize score display with 6 digits
+
+	PlayAudio(g_BgmId, true);
 
 #ifdef _DEBUG
 	Collision_Debug_Initialize();
@@ -53,28 +69,43 @@ void Game_Finalize()
 #ifdef _DEBUG
 	Collision_Debug_Finalize();
 #endif
-	Game_Impact_Finalize();
+	GameScore_Finalize();
+	GameImpact_Finalize();
 	GamePlayer_Finalize();
 	GamePlayerBullet_Finalize();
 	GameEnemy_Finalize();
-	Game_Impact_Finalize();
+	UnloadAudio(g_BgmId);
 	Texture_Release(g_TextureId_Bg);
 }
 
 void Game_Update(float delta_time)
 {
-	GamePlayer_Update(delta_time);
-	GamePlayerBullet_Update(delta_time);	
-	EnemySpawner_Update(delta_time);
-	GameEnemy_Update(delta_time);
-	FlipBookAnimation_Update(delta_time);
+	if (InputKeyboard_IsTrigger(KK_P))
+	{
+		g_gameState = (g_gameState == STATE_PLAYING) ? STATE_PAUSE : STATE_PLAYING;
+	}
+	
+	switch (g_gameState)
+	{
+	case STATE_PLAYING:
+		GamePlayer_Update(delta_time);
+		GamePlayerBullet_Update(delta_time);
+		EnemySpawner_Update(delta_time);
+		GameEnemy_Update(delta_time);
+		FlipBookAnimation_Update(delta_time);
 
-	Collision_CheckPlayerBulletsVsEnemies();
-	// Additional collision checks can be added here, such as player vs enemies, etc.
+		Collision_CheckPlayerBulletsVsEnemies();
+		// Additional collision checks can be added here, such as player vs enemies, etc.
 
-	GamePlayerBullet_CleanUp();
-	GameEnemy_CleanUp();
-	Game_Impact_Update(delta_time);
+		GamePlayerBullet_CleanUp();
+		GameEnemy_CleanUp();
+		GameImpact_Update(delta_time);
+		GameScore_Update(delta_time);
+		break;
+
+	case STATE_PAUSE:
+		break;
+	}
 }
 
 void Game_Draw()
@@ -84,7 +115,9 @@ void Game_Draw()
 	GamePlayer_Draw();
 	GamePlayerBullet_Draw();
 	GameEnemy_Draw();
-	Game_Impact_Draw();
+	GameImpact_Draw();
+	Sprite_SetFilter(kSpriteFilter_Point);
+	GameScore_Draw(1200.0f, 10.0f, 0.5f);
 }
 
 void Collision_CheckPlayerBulletsVsEnemies()
@@ -99,10 +132,13 @@ void Collision_CheckPlayerBulletsVsEnemies()
 
 			if (Collision_IsOverlap(bulletCircle, enemyCircle))
 			{
-				Game_Impact_Trigger(GameEnemy_GetExplosionType(enemy_index), enemyCircle.position.x, enemyCircle.position.y);
+				GameImpact_Trigger(GameEnemy_GetExplosionType(enemy_index), enemyCircle.position.x, enemyCircle.position.y);
 
 				GamePlayerBullet_Destroy(player_bullet_index);
 				GameEnemy_Destroy(enemy_index);
+
+				g_score += 10;
+				GameScore_SetScore(g_score);
 				break;
 			}
 		}
