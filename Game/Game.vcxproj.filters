@@ -109,6 +109,9 @@
     <ClCompile Include="result.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="fade.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="debug_ostream.h">
@@ -202,6 +205,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="result.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="fade.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

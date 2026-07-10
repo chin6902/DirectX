@@ -23,6 +23,7 @@ LastUpdate : 2026/06/24
 #include "game_impact.h"
 #include "game_score.h"
 #include "scene.h"
+#include "fade.h"
 
 enum State
 {
@@ -33,6 +34,7 @@ enum State
 };
 
 static State g_gameState = STATE_PLAYING;
+static bool g_IsChangeScene = false;
 
 static int g_TextureId_Bg = TEXTURE_INVALID_ID;
 static int g_BgmId = -1;
@@ -41,7 +43,9 @@ constexpr float startX = 50.0f;
 constexpr float startY = (SCREEN_HEIGHT - 64.0f) * 0.5f;
 static int g_score = 0;
 
-int debug_result = 0;
+#ifdef _DEBUG
+	int debug_result = 0;
+#endif
 
 void Collision_CheckPlayerBulletsVsEnemies();
 
@@ -66,6 +70,9 @@ void Game_Initialize()
 #ifdef _DEBUG
 	Collision_Debug_Initialize();
 #endif
+
+	Fade_Start(FADE_IN, 1.0f, { 0.0f, 0.0f, 0.0f, 0.0f });
+	g_IsChangeScene = false;
 }
 
 void Game_Finalize()
@@ -113,9 +120,20 @@ void Game_Update(float delta_time)
 
 	debug_result = g_score;
 
-	if (debug_result == 100)
+	if (!g_IsChangeScene)
 	{
-		Scene_SetNextScene(SCENE_RESULT);
+		if (debug_result == 100)
+		{
+			Fade_Start(FADE_OUT, 1.0f, { 0.0f, 0.0f, 0.0f, 1.0f });
+			g_IsChangeScene = true;
+		}
+	}
+	else
+	{
+		if (Fade_IsFinished())
+		{
+			Scene_SetNextScene(SCENE_RESULT);
+		}
 	}
 }
 

@@ -12,12 +12,17 @@ LastUpdate : 2026/07/09
 #include "config.h"
 #include "input_keyboard.h"
 #include "scene.h"
+#include "fade.h"
 
 static int g_result_texture_id = -1;
+static bool g_IsChangeScene = false;
 
 void Result_Initialize()
 {
 	g_result_texture_id = Texture_Load(L"assets/textures/result.png");
+
+	Fade_Start(FADE_IN, 1.0f, { 0.0f, 0.0f, 0.0f, 0.0f });
+	g_IsChangeScene = false;
 }
 
 void Result_Finalize()

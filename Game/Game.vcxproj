@@ -150,6 +150,7 @@
   <ItemGroup>
     <ClCompile Include="application.cpp" />
     <ClCompile Include="Audio.cpp" />
+    <ClCompile Include="fade.cpp" />
     <ClCompile Include="game_impact.cpp" />
     <ClCompile Include="collision.cpp" />
     <ClCompile Include="collision_debug.cpp" />
@@ -182,6 +183,7 @@
   <ItemGroup>
     <ClInclude Include="application.h" />
     <ClInclude Include="Audio.h" />
+    <ClInclude Include="fade.h" />
     <ClInclude Include="game_impact.h" />
     <ClInclude Include="collision.h" />
     <ClInclude Include="collision_debug.h" />
