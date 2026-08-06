@@ -12,6 +12,46 @@ LastUpdate : 2026/07/01
 #include "game_enemy.h"
 #include "config.h"
 
+struct SpawnData
+{
+	EnemyType type;
+	float spawnX;
+	float spawnY;
+	float spawnTime;
+};
+
+// use text file to store spawn data for more flexibility
+static constexpr SpawnData spawnData[3][1200] =
+{
+	{
+		{ EnemyType_Normal, SCREEN_WIDTH + 50.0f, 100.0f, 0.0f },
+		{ EnemyType_Fast, SCREEN_WIDTH + 50.0f, 200.0f, 1.0f },
+		{ EnemyType_Normal, SCREEN_WIDTH + 50.0f, 300.0f, 2.0f },
+		{ EnemyType_Fast, SCREEN_WIDTH + 50.0f, 400.0f, 3.0f },
+		{ EnemyType_Invalid, 0.0f, 0.0f, -1.0f }
+	},
+
+	{
+		{ EnemyType_Normal, SCREEN_WIDTH + 50.0f, 100.0f, 0.0f },
+		{ EnemyType_Fast, SCREEN_WIDTH + 50.0f, 200.0f, 1.0f },
+		{ EnemyType_Normal, SCREEN_WIDTH + 50.0f, 300.0f, 2.0f },
+		{ EnemyType_Fast, SCREEN_WIDTH + 50.0f, 400.0f, 3.0f },
+		{ EnemyType_Invalid, 0.0f, 0.0f, -1.0f }
+	},
+
+	{
+		{ EnemyType_Normal, SCREEN_WIDTH + 50.0f, 100.0f, 0.0f },
+		{ EnemyType_Fast, SCREEN_WIDTH + 50.0f, 200.0f, 1.0f },
+		{ EnemyType_Normal, SCREEN_WIDTH + 50.0f, 300.0f, 2.0f },
+		{ EnemyType_Fast, SCREEN_WIDTH + 50.0f, 400.0f, 3.0f },
+		{ EnemyType_Invalid, 0.0f, 0.0f, -1.0f }
+	}
+};
+
+static int g_StageNumber = 0;
+static int g_CurrentIndex = 0; // where in list of spawn data we are currently at
+static float acumulatedTime = 0.0f; 
+
 static float SpawnX = SCREEN_WIDTH + 50.0f; 
 
 static void SpawnEnemy();

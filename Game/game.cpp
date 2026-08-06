@@ -14,6 +14,7 @@ LastUpdate : 2026/06/24
 #include "flipbook_animation.h"
 
 #include "game.h"
+#include "camera.h"
 #include "game_player.h"
 #include "game_playerBullet.h"
 #include "enemy_spawner.h"
@@ -24,6 +25,8 @@ LastUpdate : 2026/06/24
 #include "game_score.h"
 #include "scene.h"
 #include "fade.h"
+#include "game_stage.h"
+#include "game_skill.h"
 
 enum State
 {
@@ -39,8 +42,6 @@ static bool g_IsChangeScene = false;
 static int g_TextureId_Bg = TEXTURE_INVALID_ID;
 static int g_BgmId = -1;
 
-constexpr float startX = 50.0f;
-constexpr float startY = (SCREEN_HEIGHT - 64.0f) * 0.5f;
 static int g_score = 0;
 
 #ifdef _DEBUG
@@ -53,19 +54,21 @@ void Game_Initialize()
 {
 	g_gameState = STATE_PLAYING;
 
-	g_TextureId_Bg = Texture_Load(L"assets/textures/Background.png", false);
+	g_TextureId_Bg = Texture_Load(L"assets/textures/Background.png");
 	g_BgmId = LoadAudio("assets/sounds/bgm.wav");
 	g_score = 0;
 
-    GamePlayer_Initialize(startX, startY);
-    GamePlayerBullet_Initialize();
+	GamePlayer_Initialize(GameStage_GetWidth() * 0.5f, GameStage_GetHeight() * 0.5f);
+	GameSkill_Initialize();
+/*    GamePlayerBullet_Initialize();
 	EnemySpawner_Initialize();
 	GameEnemy_Initialize();
 	GameImpact_Create();
 	GameImpact_Initialize();
-	GameScore_Initialize(6); // Initialize score display with 6 digits
+	GameScore_Initialize(6); // Initialize score display with 6 digits*/
+	GameStage_Initialize();
 
-	PlayAudio(g_BgmId, true);
+	//PlayAudio(g_BgmId, true);
 
 #ifdef _DEBUG
 	Collision_Debug_Initialize();
@@ -80,11 +83,13 @@ void Game_Finalize()
 #ifdef _DEBUG
 	Collision_Debug_Finalize();
 #endif
-	GameScore_Finalize();
-	GameImpact_Finalize();
+	GameStage_Finalize();
+	/*GameScore_Finalize();
+	GameImpact_Finalize();*/
+	GameSkill_Finalize();
 	GamePlayer_Finalize();
-	GamePlayerBullet_Finalize();
-	GameEnemy_Finalize();
+	/*GamePlayerBullet_Finalize();
+	GameEnemy_Finalize();*/
 	UnloadAudio(g_BgmId);
 	Texture_Release(g_TextureId_Bg);
 }
@@ -100,18 +105,20 @@ void Game_Update(float delta_time)
 	{
 	case STATE_PLAYING:
 		GamePlayer_Update(delta_time);
-		GamePlayerBullet_Update(delta_time);
-		EnemySpawner_Update(delta_time);
-		GameEnemy_Update(delta_time);
+		GameSkill_Update(delta_time);
+		Camera_Update(delta_time);
+		//GamePlayerBullet_Update(delta_time);
+		//EnemySpawner_Update(delta_time);
+		//GameEnemy_Update(delta_time);
 		FlipBookAnimation_Update(delta_time);
 
-		Collision_CheckPlayerBulletsVsEnemies();
+		//Collision_CheckPlayerBulletsVsEnemies();
 		// Additional collision checks can be added here, such as player vs enemies, etc.
 
-		GamePlayerBullet_CleanUp();
+		/*GamePlayerBullet_CleanUp();
 		GameEnemy_CleanUp();
 		GameImpact_Update(delta_time);
-		GameScore_Update(delta_time);
+		GameScore_Update(delta_time);*/
 		break;
 
 	case STATE_PAUSE:
@@ -122,11 +129,13 @@ void Game_Update(float delta_time)
 
 	if (!g_IsChangeScene)
 	{
+		/*
 		if (debug_result == 100)
 		{
 			Fade_Start(FADE_OUT, 1.0f, { 0.0f, 0.0f, 0.0f, 1.0f });
 			g_IsChangeScene = true;
 		}
+		*/
 	}
 	else
 	{
@@ -139,14 +148,17 @@ void Game_Update(float delta_time)
 
 void Game_Draw()
 {
+	GameStage_Draw();
+	GameStage_DebugDraw();
 	Sprite_SetFilter(kSpriteFilter_Linear);
-	Sprite_Draw(g_TextureId_Bg, 0.0f, 0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT, 0.0f, 0.0f, Texture_GetWidth(g_TextureId_Bg), Texture_GetHeight(g_TextureId_Bg));
 	GamePlayer_Draw();
-	GamePlayerBullet_Draw();
+	GameSkill_Draw();
+	/*GamePlayerBullet_Draw();
 	GameEnemy_Draw();
 	GameImpact_Draw();
 	Sprite_SetFilter(kSpriteFilter_Point);
-	GameScore_Draw(1200.0f, 10.0f, 0.5f);
+
+	GameScore_Draw(1200.0f, 10.0f, 0.5f);*/
 }
 
 void Collision_CheckPlayerBulletsVsEnemies()

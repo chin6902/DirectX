@@ -4,7 +4,7 @@ Contents   :  [sprite.cpp]
 Author     : Chin Qing You
 LastUpdate : 2026/06/22
 -----------------------------------------------------------------------------
-
+TODO: batch rendering
 ============================================================================*/
 #include "debug_ostream.h"
 #include "config.h"
@@ -152,6 +152,9 @@ static void Sprite_DrawInternal(
     const SpriteDrawParams& params)
 {
     Shader_Begin();
+
+    // --- Set sampler state for pixel shader ---
+    Sprite_SetFilter(kSpriteFilter_Point);
 
     // --- World transform (scale → rotate → translate → project) ---
     //

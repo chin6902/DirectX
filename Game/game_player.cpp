@@ -12,8 +12,16 @@ LastUpdate : 2026/06/24
 #include "texture.h"
 #include "sprite.h" //"flipbook animation"
 #include "input_keyboard.h"
+#include "input_mouse.h"
 #include "config.h"
 #include "game_playerBullet.h"
+#include "vector2.h"
+#include "camera.h"
+#include "game_stage.h"
+#include "collision_debug.h"
+
+#include "player_attack.h"
+#include "player_charge.h"
 
 using namespace DirectX;
 
@@ -21,98 +29,149 @@ using namespace DirectX;
 static int g_player_texture_ID = -1;
 static float g_player_width = 96.0f;
 static float g_player_height = 64.0f;
+static constexpr float PLAYER_COLLIDER_RADIUS = 25.6f;
 		
 //player position
-static float g_playerX = 0.0f;
-static float g_playerY = 0.0f;
-static float g_playerOffsetX = 30.0f;
-static float g_playerOffsetY = 0.0f;
-static float g_playerSpeed = 300.0f;
+static Vector2 g_Pos;
+static float g_Speed = 300.0f;
+
+static Vector2 g_AimDir{ 1.0f, 0.0f };
+
+static void UpdateAim();
+static void UpdateMovement(float delta_time);
+
+enum PlayerState
+{
+	PLAYER_STATE_NORMAL,
+	PLAYER_STATE_CHARGING,
+};
+
+static PlayerState g_State = PLAYER_STATE_NORMAL;
+
+static void ChangeState(PlayerState nextState)
+{
+	if (g_State == nextState) { return; }       
+
+	g_State = nextState;
+}
 
 void GamePlayer_Initialize(float startX, float startY)
 {				
 	//プレイヤーのテクスチャを読み込む
 	g_player_texture_ID = Texture_Load(L"assets/textures/player.png");
-	g_playerX = startX;
-	g_playerY = startY;
+	g_Pos = { startX, startY };
+
+	PlayerAttack_Initialize();
+	PlayerCharge_Initialize();
 }
 
 void GamePlayer_Finalize()
 {
+	PlayerAttack_Finalize();
+	PlayerCharge_Finalize();
 	//プレイヤーのテクスチャを解放する
 	Texture_Release(g_player_texture_ID);
 }
 
 void GamePlayer_Update(float delta_time)
 {
-	DirectX::XMFLOAT2 velocity = { 0.0f, 0.0f };
+	UpdateAim();
+	UpdateMovement(delta_time);
 
-	if (InputKeyboard_IsPress(KK_A) || InputKeyboard_IsPress(KK_LEFT))
-	{
-		velocity.x -= 1.0f;
-	}
-	if (InputKeyboard_IsPress(KK_D) || InputKeyboard_IsPress(KK_RIGHT))
-	{
-		velocity.x += 1.0f;
-	}
-	if (InputKeyboard_IsPress(KK_W) || InputKeyboard_IsPress(KK_UP))
-	{
-		velocity.y -= 1.0f;
-	}
-	if (InputKeyboard_IsPress(KK_S) || InputKeyboard_IsPress(KK_DOWN))
-	{
-		velocity.y += 1.0f;
-	}
-
-	//Normalize velocity vector to prevent faster diagonal movement
-	XMVECTOR vel = XMLoadFloat2(&velocity);
-	XMVECTOR len = XMVector2Length(vel);
-
-	if (XMVectorGetX(len) > 0.0f)
-	{
-		vel = XMVector2Normalize(vel);
-		XMStoreFloat2(&velocity, vel);
-
-		//Apply speed and delta time
-		g_playerX += velocity.x * g_playerSpeed * delta_time;
-		g_playerY += velocity.y * g_playerSpeed * delta_time;
-
-		//g_playerX = std::clamp(g_playerX, -g_playerOffsetX, SCREEN_WIDTH - g_player_width + g_playerOffsetX);
-		//g_playerY = std::clamp(g_playerY, -g_playerOffsetY, SCREEN_HEIGHT - g_player_height + g_playerOffsetY);
-		
-		//Clamp to screen bounds
-		if (g_playerX < -g_playerOffsetX) g_playerX = -g_playerOffsetX;
-		if (g_playerX > SCREEN_WIDTH - g_player_width + g_playerOffsetX) g_playerX = SCREEN_WIDTH - g_player_width + g_playerOffsetX;
-		if (g_playerY < -g_playerOffsetY) g_playerY = -g_playerOffsetY;
-		if (g_playerY > SCREEN_HEIGHT - g_player_height + g_playerOffsetY) g_playerY = SCREEN_HEIGHT - g_player_height + g_playerOffsetY;
-	}
-
-	// Fire bullet when space is triggered
 	if (InputKeyboard_IsTrigger(KK_SPACE))
 	{
-		GamePlayerBullet_Create(g_playerX + g_player_width, g_playerY + g_player_height * 0.5f);
+		PlayerCharge_TryRelease();
+	}
+
+	switch (g_State)
+	{
+	case PLAYER_STATE_NORMAL:
+		if (PlayerCharge_IsChargeKeyHeld()) { ChangeState(PLAYER_STATE_CHARGING); break; }
+		PlayerAttack_Update(delta_time);
+		break;
+
+	case PLAYER_STATE_CHARGING:
+		PlayerCharge_Update(delta_time);
+		if (!PlayerCharge_IsChargeKeyHeld()) { ChangeState(PLAYER_STATE_NORMAL); }
+		break;
 	}
 }
 
 void GamePlayer_Draw()
 {
 	//座標にプレイヤーを描画する
-	Sprite_Draw(g_player_texture_ID, g_playerX, g_playerY, g_player_width, g_player_height);		
+	Sprite_Draw(
+		g_player_texture_ID, 
+		Camera_WorldToScreenX(g_Pos.x - g_player_width * 0.5f), Camera_WorldToScreenY(g_Pos.y - g_player_height * 0.5f), 
+		g_player_width, g_player_height
+	);
+
+	PlayerAttack_Draw();
+	PlayerCharge_Draw();
+
+#ifdef _DEBUG
+	Collision_Debug_Draw(
+		{ { Camera_WorldToScreenX(g_Pos.x), Camera_WorldToScreenY(g_Pos.y) }, PLAYER_COLLIDER_RADIUS },
+		{ 0.0f, 1.0f, 0.0f });
+
+	const Vector2 marker = g_Pos + g_AimDir * 100.0f;
+	Collision_Debug_Draw(
+		{ { Camera_WorldToScreenX(marker.x), Camera_WorldToScreenY(marker.y) }, 6.0f },
+		{ 1.0f, 1.0f, 0.0f });
+#endif
+}
+
+static void UpdateMovement(float delta_time)
+{
+	Vector2 dir{ 0.0f, 0.0f };
+
+	if (InputKeyboard_IsPress(KK_W)) { dir.y -= 1.0f; }
+	if (InputKeyboard_IsPress(KK_S)) { dir.y += 1.0f; }
+	if (InputKeyboard_IsPress(KK_A)) { dir.x -= 1.0f; }
+	if (InputKeyboard_IsPress(KK_D)) { dir.x += 1.0f; }
+
+	if (dir.IsZero())
+	{
+		return;
+	}
+
+	const Vector2 old_pos = g_Pos;
+	g_Pos += Vector2_Normalize(dir) * (g_Speed * delta_time);
+	g_Pos = GameStage_ResolvePosition(old_pos, g_Pos, PLAYER_COLLIDER_RADIUS);
+}
+
+static void UpdateAim()
+{
+	const Vector2 mouse_world{
+		Camera_ScreenToWorldX(static_cast<float>(InputMouse_GetX())),
+		Camera_ScreenToWorldY(static_cast<float>(InputMouse_GetY()))
+	};
+
+	const Vector2 to_mouse = mouse_world - g_Pos;
+	if (to_mouse.LengthSq() > 1.0f)      // cursor on top of player -> keep last aim
+	{
+		g_AimDir = Vector2_Normalize(to_mouse);
+	}
 }
 
 float GamePlayer_GetPosX()
 {
-	return g_playerX;
+	return g_Pos.x;
 }
 
 float GamePlayer_GetPosY()
 {
-	return g_playerY;
+	return g_Pos.y;
 }
 
 float GamePlayer_GetSpeed()
 {
-	return g_playerSpeed;
+	return g_Speed;
+}
+
+Vector2 GamePlayer_GetAimDir()
+{
+	return g_AimDir;
 }
 
 void GamePlayer_SetSpeed(float speed)
@@ -122,5 +181,5 @@ void GamePlayer_SetSpeed(float speed)
 		speed = 0.0f;
 	}
 
-	g_playerSpeed = speed;
+	g_Speed = speed;
 }

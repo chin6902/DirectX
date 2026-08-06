@@ -150,6 +150,7 @@
   <ItemGroup>
     <ClCompile Include="application.cpp" />
     <ClCompile Include="Audio.cpp" />
+    <ClCompile Include="camera.cpp" />
     <ClCompile Include="fade.cpp" />
     <ClCompile Include="game_impact.cpp" />
     <ClCompile Include="collision.cpp" />
@@ -163,12 +164,17 @@
     <ClCompile Include="game_player.cpp" />
     <ClCompile Include="game_playerBullet.cpp" />
     <ClCompile Include="game_score.cpp" />
+    <ClCompile Include="game_skill.cpp" />
+    <ClCompile Include="game_stage.cpp" />
+    <ClCompile Include="game_time.cpp" />
     <ClCompile Include="input_keyboard.cpp" />
     <ClCompile Include="input_mouse.cpp" />
     <ClCompile Include="input_xinput.cpp" />
     <ClCompile Include="keyboard.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="mouse.cpp" />
+    <ClCompile Include="player_attack.cpp" />
+    <ClCompile Include="player_charge.cpp" />
     <ClCompile Include="polygon.cpp" />
     <ClCompile Include="result.cpp" />
     <ClCompile Include="scene.cpp" />
@@ -183,6 +189,8 @@
   <ItemGroup>
     <ClInclude Include="application.h" />
     <ClInclude Include="Audio.h" />
+    <ClInclude Include="camera.h" />
+    <ClInclude Include="element.h" />
     <ClInclude Include="fade.h" />
     <ClInclude Include="game_impact.h" />
     <ClInclude Include="collision.h" />
@@ -198,11 +206,16 @@
     <ClInclude Include="game_player.h" />
     <ClInclude Include="game_playerBullet.h" />
     <ClInclude Include="game_score.h" />
+    <ClInclude Include="game_skill.h" />
+    <ClInclude Include="game_stage.h" />
+    <ClInclude Include="game_time.h" />
     <ClInclude Include="input_keyboard.h" />
     <ClInclude Include="input_mouse.h" />
     <ClInclude Include="input_xinput.h" />
     <ClInclude Include="keyboard.h" />
     <ClInclude Include="mouse.h" />
+    <ClInclude Include="player_attack.h" />
+    <ClInclude Include="player_charge.h" />
     <ClInclude Include="polygon.h" />
     <ClInclude Include="result.h" />
     <ClInclude Include="scene.h" />
@@ -211,6 +224,7 @@
     <ClInclude Include="system_timer.h" />
     <ClInclude Include="texture.h" />
     <ClInclude Include="title.h" />
+    <ClInclude Include="vector2.h" />
     <ClInclude Include="WICTextureLoader11.h" />
     <ClInclude Include="Window.h" />
   </ItemGroup>

@@ -11,7 +11,7 @@ LastUpdate : 2026/07/09
 #include "game.h"
 #include "result.h"
 
-static Scene g_currentScene = SCENE_TITLE;
+static Scene g_currentScene = SCENE_GAME;
 static Scene g_nextScene = g_currentScene;
 
 void Scene_Initialize()

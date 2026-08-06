@@ -17,6 +17,7 @@ void GameEnemy_Finalize();
 
 enum EnemyType
 {
+	EnemyType_Invalid = -1,
 	EnemyType_Normal,
 	EnemyType_Fast,
 };

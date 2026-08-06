@@ -19,4 +19,21 @@ struct CollisionCircle
 
 bool Collision_IsOverlap(const CollisionCircle& a, const CollisionCircle& b);
 
+struct CollisionRect
+{
+	DirectX::XMFLOAT2 min;
+	DirectX::XMFLOAT2 max;
+};
+
+bool Collision_IsOverlap(const CollisionRect& a, const CollisionRect& b);
+
+struct HitData
+{
+	bool isHit;
+	DirectX::XMFLOAT2 normal;
+	CollisionRect rectangle;
+};
+
+HitData Collision_IsHit(const CollisionRect& a, const CollisionRect& b);
+
 #endif

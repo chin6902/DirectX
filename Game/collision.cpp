@@ -7,6 +7,7 @@ LastUpdate : 2026/04/15
 
 ============================================================================*/
 #include "collision.h"
+#include <algorithm>
 
 using namespace DirectX;
 
@@ -18,4 +19,68 @@ bool Collision_IsOverlap(const CollisionCircle& a, const CollisionCircle& b)
 	float lengthSq = XMVectorGetX(XMVector2LengthSq(pos_a - pos_b));
 	float radiusSum = a.radius + b.radius;
 	return lengthSq < radiusSum * radiusSum;
+}
+
+bool Collision_IsOverlap(const CollisionRect& a, const CollisionRect& b)
+{
+	if (a.max.x <= b.min.x) return false;
+	if (a.min.x >= b.max.x) return false;
+	if (a.max.y <= b.min.y) return false;
+	if (a.min.y >= b.max.y) return false;
+
+	return true;
+}
+
+// For collision with stage
+HitData Collision_IsHit(const CollisionRect& a, const CollisionRect& b)
+{
+	HitData hit{};
+	hit.isHit = false;
+	hit.normal = { 0.0f, 0.0f };
+	hit.rectangle = b;
+
+	if (!Collision_IsOverlap(a, b))
+	{
+		return hit;
+	}
+
+	hit.isHit = true;
+
+	float overlapLeft = a.max.x - b.min.x; // overlap from the left side of a to the right side of b
+	float overlapRight = b.max.x - a.min.x; // overlap from the right side of a to the left side of b
+	float overlapTop = a.max.y - b.min.y; // overlap from the top side of a to the bottom side of b
+	float overlapBottom = b.max.y - a.min.y; // overlap from the bottom side of a to the top side of b
+
+	float overlapX = (overlapLeft < overlapRight) ? overlapLeft : overlapRight;
+	float overlapY = (overlapTop < overlapBottom) ? overlapTop : overlapBottom;
+
+	// Determine the collision normal based on the smallest overlap
+	if(overlapX < overlapY)
+	{
+		// Collision is more horizontal than vertical
+		if (overlapLeft < overlapRight)
+		{
+			hit.normal = { -1.0f, 0.0f }; // Hit from left
+		}
+		// Collision is more vertical than horizontal
+		else
+		{
+			hit.normal = { 1.0f, 0.0f }; // Hit from right
+		}
+	}
+	else
+	{
+		// Collision is more vertical than horizontal
+		if (overlapTop < overlapBottom)
+		{
+			hit.normal = { 0.0f, -1.0f }; // Hit from top
+		}
+		// Collision is more horizontal than vertical
+		else
+		{
+			hit.normal = { 0.0f, 1.0f }; // Hit from bottom
+		}
+	}
+
+	return hit;
 }

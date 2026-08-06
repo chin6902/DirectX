@@ -92,7 +92,7 @@ void Collision_Debug_Initialize()
     dsd.DepthEnable = FALSE;
     Direct3D_GetDevice()->CreateDepthStencilState(&dsd, &g_pDepthStencilState);
 
-	g_WhiteTextureID = Texture_Load(L"assets/textures/white.png", false);
+	g_WhiteTextureID = Texture_Load(L"assets/textures/white_debug.png", false);
 }
 
 void Collision_Debug_Finalize()
