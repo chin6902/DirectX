@@ -32,9 +32,6 @@ struct Vertex
 
 static constexpr int NUM_VERTEX{ 4 };
 
-// ============================================================================
-// Initialize / Finalize
-// ============================================================================
 bool Sprite_Initialize()
 {
     // --- Vertex buffer (unit quad, centred on origin) ---
@@ -137,7 +134,7 @@ void Sprite_SetFilter(SpriteFilter filter)
 //
 // Parameters
 //   texture_id          : loaded texture handle
-//   x, y               : screen position (top-left of the sprite)
+//   x, y                : screen position (top-left of the sprite)
 //   width, height       : on-screen draw size in pixels
 //   texture_x/y         : top-left of the source region inside the texture
 //   texture_width/height: size of the source region inside the texture

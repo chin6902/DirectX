@@ -23,29 +23,7 @@ struct SpawnData
 // use text file to store spawn data for more flexibility
 static constexpr SpawnData spawnData[3][1200] =
 {
-	{
-		{ EnemyType_Normal, SCREEN_WIDTH + 50.0f, 100.0f, 0.0f },
-		{ EnemyType_Fast, SCREEN_WIDTH + 50.0f, 200.0f, 1.0f },
-		{ EnemyType_Normal, SCREEN_WIDTH + 50.0f, 300.0f, 2.0f },
-		{ EnemyType_Fast, SCREEN_WIDTH + 50.0f, 400.0f, 3.0f },
-		{ EnemyType_Invalid, 0.0f, 0.0f, -1.0f }
-	},
 
-	{
-		{ EnemyType_Normal, SCREEN_WIDTH + 50.0f, 100.0f, 0.0f },
-		{ EnemyType_Fast, SCREEN_WIDTH + 50.0f, 200.0f, 1.0f },
-		{ EnemyType_Normal, SCREEN_WIDTH + 50.0f, 300.0f, 2.0f },
-		{ EnemyType_Fast, SCREEN_WIDTH + 50.0f, 400.0f, 3.0f },
-		{ EnemyType_Invalid, 0.0f, 0.0f, -1.0f }
-	},
-
-	{
-		{ EnemyType_Normal, SCREEN_WIDTH + 50.0f, 100.0f, 0.0f },
-		{ EnemyType_Fast, SCREEN_WIDTH + 50.0f, 200.0f, 1.0f },
-		{ EnemyType_Normal, SCREEN_WIDTH + 50.0f, 300.0f, 2.0f },
-		{ EnemyType_Fast, SCREEN_WIDTH + 50.0f, 400.0f, 3.0f },
-		{ EnemyType_Invalid, 0.0f, 0.0f, -1.0f }
-	}
 };
 
 static int g_StageNumber = 0;
@@ -92,15 +70,14 @@ static void SpawnEnemy()
 	switch(randomType)
 	{
 		case 0:
-			type = EnemyType_Normal;
+			//type = EnemyType_Normal;
 			break;
 		case 1:
-			type = EnemyType_Fast;
+			//type = EnemyType_Fast;
 			break;
 		default:
-			type = EnemyType_Normal;
 			break;
 	}
 
-	GameEnemy_Create(type, SpawnX, spawnY);
+	//GameEnemy_Create(type, SpawnX, spawnY);
 }

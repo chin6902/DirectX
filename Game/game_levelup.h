@@ -1,22 +1,17 @@
 /*============================================================================
-Contents   :  [element.h]
-
+Contents   :  [game_levelup.h]
+              
 Author     : Chin Qing You
-LastUpdate : 2026/08/10
+LastUpdate : 2026/08/14
 -----------------------------------------------------------------------------
 
 ============================================================================*/
-#ifndef ELEMENT_H
-#define ELEMENT_H
+#ifndef GAME_LEVELUP_H
+#define GAME_LEVELUP_H
 
-enum ElementType
-{
-	ELEMENT_FIRE,
-	ELEMENT_ICE,
-	ELEMENT_THUNDER,
-	ELEMENT_TYPE_COUNT
-};
-
-static constexpr int ELEMENT_NONE = -1;
+void GameLevelUp_Initialize();
+void GameLevelUp_Finalize();
+void GameLevelUp_Update(float delta_time);
+void GameLevelUp_Draw();
 
 #endif

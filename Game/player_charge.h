@@ -22,4 +22,9 @@ bool PlayerCharge_IsChargeKeyHeld();
 bool PlayerCharge_TryRelease();               
 int  PlayerCharge_GetSlotCount();
 
+void PlayerCharge_UpdateAlways(float delta_time);
+
+float PlayerCharge_GetUltimateFraction(); 
+ElementType PlayerCharge_GetUltimateElement();
+
 #endif

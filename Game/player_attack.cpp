@@ -19,7 +19,7 @@ LastUpdate : 2026/08/01
 #include "collision_debug.h"
 
 // attack parameters
-static constexpr float ATTACK_COOLDOWN = 1.0f;
+static constexpr float ATTACK_COOLDOWN = 3.0f;
 static constexpr float ATTACK_RANGE = 150.0f;
 static constexpr int   ATTACK_DAMAGE = 1;
 static constexpr float ATTACK_HALF_ANGLE = 0.7853f;            // 45 deg -> 90 deg cone
@@ -101,9 +101,21 @@ void PlayerAttack_Update(float delta_time)
 		const CollisionCircle cc = GameEnemy_GetCollisionCircle(i);
 		const Vector2 to_enemy = Vector2{ cc.position.x, cc.position.y } - origin;
 
+		// Test 1: range
 		if (to_enemy.LengthSq() > ATTACK_RANGE * ATTACK_RANGE) { continue; }
+		// Test 2: angle
 		if (Vector2_Dot(aim, Vector2_Normalize(to_enemy)) < COS_HALF_ANGLE) { continue; }
 
+		HitInfo hit;
+		hit.damage = ATTACK_DAMAGE;
+		hit.knockback_speed = 250.0f;      // light tap
+		hit.knockback_time = 0.12f;
+		hit.hitstun_time = 0.20f;
+		hit.direction = Vector2_Normalize(to_enemy);
+
+		if (GameEnemy_ApplyHit(i, hit))
+		{
+		}
 	}
 }
 
@@ -131,23 +143,4 @@ void PlayerAttack_Draw()
 				p);
 		}
 	}
-
-	// --- Debug arc
-#ifdef _DEBUG
-	const Vector2 origin = { GamePlayer_GetPosX(), GamePlayer_GetPosY() };
-	const float aim_angle = Vector2_ToAngle(GamePlayer_GetAimDir());
-	const DirectX::XMFLOAT3 color = (g_SwingFlashTimer > 0.0f)
-		? DirectX::XMFLOAT3{ 1.0f, 0.3f, 0.1f }     // just swung
-	: DirectX::XMFLOAT3{ 0.6f, 0.6f, 0.6f };    // idle
-
-	for (int i = 0; i <= 8; i++)
-	{
-		const float a = aim_angle - ATTACK_HALF_ANGLE
-			+ (ATTACK_HALF_ANGLE * 2.0f) * (i / 8.0f);   // 8.0f: float div!
-		const Vector2 p = origin + Vector2_FromAngle(a) * ATTACK_RANGE;
-		Collision_Debug_Draw(
-			{ { Camera_WorldToScreenX(p.x), Camera_WorldToScreenY(p.y) }, 4.0f },
-			color);
-	}
-#endif
 }

@@ -16,9 +16,6 @@ LastUpdate : 2026/07/27
 #include "camera.h"
 #include "collision_debug.h"
 
-// ============================================================================
-// Tilesheet layout (source texture, no spacing)
-// ============================================================================
 static int g_TextureId = -1;
 
 static constexpr int TILE_SIZE = 18;   // texel size of one tile in the sheet
@@ -43,9 +40,6 @@ static constexpr int TILE_WALL = 22;
 
 static constexpr float COLLISION_SKIN = 0.05f;
 
-// ============================================================================
-// Internal helpers
-// ============================================================================
 static void GenerateDebugMap();
 static void DrawTile(int tileId, float screenX, float screenY);
 
@@ -66,9 +60,6 @@ static bool IsSolidCell(int tx, int ty)
 	return IsSolidTile(g_Map[ty][tx]);
 }
 
-// ============================================================================
-// Initialize / Finalize
-// ============================================================================
 void GameStage_Initialize()
 {
 	g_TextureId = Texture_Load(L"assets/textures/result.png");
@@ -118,9 +109,6 @@ static void GenerateDebugMap()
 	for (int y = 25; y < 31; ++y) { g_Map[y][55] = TILE_WALL; }
 }
 
-// ============================================================================
-// Drawing — cull to the camera rectangle, draw only visible tiles
-// ============================================================================
 static void DrawTile(int tileId, float screenX, float screenY)
 {
 	if (tileId < 0)
@@ -142,8 +130,6 @@ static void DrawTile(int tileId, float screenX, float screenY)
 
 void GameStage_Draw()
 {
-	// Which tile range does the camera rectangle overlap?
-	// The range IS the cull — no per-tile screen test needed.
 	int startCol = static_cast<int>(Camera_GetX() / DRAW_TILE_SIZE);
 	int startRow = static_cast<int>(Camera_GetY() / DRAW_TILE_SIZE);
 	int endCol = startCol + static_cast<int>(SCREEN_WIDTH / DRAW_TILE_SIZE) + 2;
@@ -171,9 +157,6 @@ void GameStage_Draw()
 	}
 }
 
-// ============================================================================
-// Queries
-// ============================================================================
 float GameStage_GetWidth() { return MAP_WIDTH * DRAW_TILE_SIZE; }
 float GameStage_GetHeight() { return MAP_HEIGHT * DRAW_TILE_SIZE; }
 

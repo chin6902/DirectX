@@ -130,6 +130,21 @@
     <ClCompile Include="game_skill.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="game_progress.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="game_levelup.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="game_text.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="game_ui.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="draw_primitives.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="debug_ostream.h">
@@ -250,6 +265,24 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="game_skill.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="game_progress.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="game_levelup.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="game_text.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="health.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="game_ui.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="draw_primitives.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

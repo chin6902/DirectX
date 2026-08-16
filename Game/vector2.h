@@ -1,4 +1,4 @@
-/*============================================================================
+﻿/*============================================================================
 Contents   :  [vector2.h]
 
 Author     : Chin Qing You
@@ -31,6 +31,7 @@ struct Vector2
 	Vector2 operator*(float s)          const { return { x * s,   y * s }; }
 	Vector2 operator/(float s)          const { return { x / s,   y / s }; }
 	Vector2 operator-()                 const { return { -x, -y }; }
+
 
 	Vector2& operator+=(const Vector2& v) { x += v.x; y += v.y; return *this; }
 	Vector2& operator-=(const Vector2& v) { x -= v.x; y -= v.y; return *this; }

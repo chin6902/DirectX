@@ -140,3 +140,19 @@ void Collision_Debug_Draw(const CollisionCircle & circle, const DirectX::XMFLOAT
 
     Direct3D_GetDeviceContext()->Draw(NUM_VERTEX, 0);
 }
+
+void Collision_Debug_Draw(const CollisionCapsule& capsule, const XMFLOAT3& color)
+{
+    // Dots along the segment, sized to the capsule's thickness.
+    constexpr int STEPS = 8;
+    for (int i = 0; i <= STEPS; i++)
+    {
+        const float t = static_cast<float>(i) / STEPS;
+        const CollisionCircle c{
+            { capsule.start.x + (capsule.end.x - capsule.start.x) * t,
+              capsule.start.y + (capsule.end.y - capsule.start.y) * t },
+            capsule.half_thickness
+        };
+        Collision_Debug_Draw(c, color);
+    }
+}

@@ -84,3 +84,39 @@ HitData Collision_IsHit(const CollisionRect& a, const CollisionRect& b)
 
 	return hit;
 }
+
+float Collision_PointSegmentDistanceSq(const DirectX::XMFLOAT2& point, const DirectX::XMFLOAT2& seg_start, const DirectX::XMFLOAT2& seg_end)
+{
+	const float sx = seg_end.x - seg_start.x;
+	const float sy = seg_end.y - seg_start.y;
+	const float len_sq = sx * sx + sy * sy;
+
+	if (len_sq < 0.0001f)
+	{
+		// Degenerate segment: it is a point.
+		const float dx = point.x - seg_start.x;
+		const float dy = point.y - seg_start.y;
+		return dx * dx + dy * dy;
+	}
+
+	// Project the point onto the infinite line, expressed as a fraction t
+	// along the segment, then clamp t to [0,1] so we stay ON the segment.
+	float t = ((point.x - seg_start.x) * sx + (point.y - seg_start.y) * sy) / len_sq;
+	t = std::clamp(t, 0.0f, 1.0f);
+
+	// Closest point on the segment, then plain distance to it.
+	const float cx = seg_start.x + sx * t;
+	const float cy = seg_start.y + sy * t;
+	const float dx = point.x - cx;
+	const float dy = point.y - cy;
+	return dx * dx + dy * dy;
+}
+
+bool Collision_IsOverlap(const CollisionCapsule& capsule, const CollisionCircle& circle)
+{
+	const float d_sq = Collision_PointSegmentDistanceSq(
+		circle.position, capsule.start, capsule.end);
+
+	const float reach = capsule.half_thickness + circle.radius;
+	return d_sq < reach * reach;
+}

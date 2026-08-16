@@ -34,6 +34,20 @@ struct HitData
 	CollisionRect rectangle;
 };
 
+struct CollisionCapsule
+{
+	DirectX::XMFLOAT2 start;
+	DirectX::XMFLOAT2 end;
+	float half_thickness;
+};
+
+bool Collision_IsOverlap(const CollisionCapsule& capsule, const CollisionCircle& circle);
+
 HitData Collision_IsHit(const CollisionRect& a, const CollisionRect& b);
+
+float Collision_PointSegmentDistanceSq(
+	const DirectX::XMFLOAT2& point,
+	const DirectX::XMFLOAT2& seg_start,
+	const DirectX::XMFLOAT2& seg_end);
 
 #endif

@@ -123,7 +123,7 @@ void GameImpact_Trigger(ExplosionType type, float x, float y)
         data.x = x;
         data.y = y;
         data.is_active = true;
-        PlayAudio(g_explosionSoundID);
+        //PlayAudio(g_explosionSoundID);
         return;
     }
 }
