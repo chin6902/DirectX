@@ -2,98 +2,123 @@
 Contents   :  [title.cpp]
 
 Author     : Chin Qing You
-LastUpdate : 2026/07/09
+LastUpdate : 2026/08/28
 -----------------------------------------------------------------------------
 
 ============================================================================*/
+#include <cmath>
+
 #include "title.h"
 #include "texture.h"
 #include "sprite.h"
 #include "config.h"
 #include "scene.h"
 #include "fade.h"
+#include "game_text.h"
+#include "game_audio.h"
 
 #include "input_keyboard.h"
-#include "Audio.h"
+#include "input_mouse.h"
 
-static int g_TitleBG_texture = -1;
-static int g_TitleButton_texture = -1;
-static constexpr float BUTTON_WIDTH = 300.0f;
-static constexpr float BUTTON_HEIGHT = 100.0f;
+using namespace DirectX;
 
-SpriteDrawParams g_buttonParams;
-static float g_ButtonAlpha = 1.0f;
-static int g_PulseDirection = -1;  
-static constexpr float MIN_ALPHA = 0.3f;
-static constexpr float MAX_ALPHA = 1.0f;
-float pulse_speed = 0.6f;
+static constexpr float BTN_W = 300.0f;
+static constexpr float BTN_H = 90.0f;
+static constexpr float BTN_X = SCREEN_WIDTH * 0.5f - BTN_W * 0.5f;
+static constexpr float BTN_Y = SCREEN_HEIGHT * 0.5f + 200.0f;
 
-static bool g_IsChangeScene = false;
+static int   g_TitleBG_texture = -1;
+static int   g_white_texture_id = -1;
 
-void ButtonPulse(float delta_time);
+static float g_PulseTime = 0.0f;
+static bool  g_WasHovered = false;
+static bool  g_IsChangeScene = false;
+
+static bool IsButtonHovered()
+{
+	const float mx = static_cast<float>(InputMouse_GetX());
+	const float my = static_cast<float>(InputMouse_GetY());
+	return mx >= BTN_X && mx <= BTN_X + BTN_W
+		&& my >= BTN_Y && my <= BTN_Y + BTN_H;
+}
 
 void Title_Initialize()
 {
-	g_TitleBG_texture = Texture_Load(L"assets/textures/title.png");
-	g_TitleButton_texture = Texture_Load(L"assets/textures/title_button.png");	
+	g_TitleBG_texture = Texture_Load(L"assets/textures/title1.png");
+	g_white_texture_id = Texture_Load(L"assets/textures/white_debug.png", false);
+	GameText_Initialize();
 
+	g_PulseTime = 0.0f;
+	g_WasHovered = false;
 	g_IsChangeScene = false;
+
+	Fade_Start(FADE_IN, 1.0f, { 0.0f, 0.0f, 0.0f, 0.0f });
 }
 
 void Title_Finalize()
 {
+	GameText_Finalize();
+	Texture_Release(g_white_texture_id);
 	Texture_Release(g_TitleBG_texture);
-	Texture_Release(g_TitleButton_texture);
 }
 
 void Title_Update(float delta_time)
 {
-	if (!g_IsChangeScene)
-	{
-		if (InputKeyboard_IsTrigger(KK_ENTER))
-		{
-			Fade_Start(FADE_OUT, 1.0f, { 0.0f, 0.0f, 0.0f, 1.0f });
-			g_IsChangeScene = true;
-		}
+	g_PulseTime += delta_time;
 
-		ButtonPulse(delta_time);
-	}
-	else
+	if (g_IsChangeScene)
 	{
-		if (Fade_IsFinished())
-		{
-			Scene_SetNextScene(SCENE_GAME);
-		}
+		if (Fade_IsFinished()) { Scene_SetNextScene(SCENE_GAME); }
+		return;
 	}
+
+	const bool hovered = IsButtonHovered();
+	if (hovered && !g_WasHovered) { GameAudio_Play(SND_BUTTON_SELECT); }
+	g_WasHovered = hovered;
+
+	const bool confirm = InputKeyboard_IsTrigger(KK_ENTER)
+		|| (InputMouse_IsTrigger(MOUSE_BUTTON_LEFT) && hovered);
+
+	if (confirm)
+	{
+		GameAudio_Play(SND_BUTTON_CHOOSE);
+		Fade_Start(FADE_OUT, 1.0f, { 0.0f, 0.0f, 0.0f, 1.0f });
+		g_IsChangeScene = true;
+	}
+}
+
+static void DrawRect(float x, float y, float w, float h,
+	const XMFLOAT3& color, float alpha)
+{
+	if (w <= 0.0f || h <= 0.0f) { return; }
+	SpriteDrawParams p;
+	p.color = color;
+	p.alpha = alpha;
+	Sprite_Draw(g_white_texture_id, x, y, w, h, p);
 }
 
 void Title_Draw()
 {
-	Sprite_Draw(g_TitleBG_texture, 0.0f, 0.0f, static_cast<float>(SCREEN_WIDTH), static_cast<float>(SCREEN_HEIGHT));
+	Sprite_Draw(g_TitleBG_texture, 0.0f, 0.0f,
+		static_cast<float>(SCREEN_WIDTH), static_cast<float>(SCREEN_HEIGHT));
 
-	Sprite_Draw(
-		g_TitleButton_texture,
-		static_cast<float>(SCREEN_WIDTH) / 2.0f - BUTTON_WIDTH / 2.0f, static_cast<float>(SCREEN_HEIGHT) / 2.0f - BUTTON_HEIGHT / 2.0f + 200.0f,
-		BUTTON_WIDTH, BUTTON_HEIGHT,
-		g_buttonParams
-	);
-}
+	Sprite_SetFilter(kSpriteFilter_Linear);
 
-void ButtonPulse(float delta_time)
-{
-	g_ButtonAlpha += g_PulseDirection * pulse_speed * delta_time;
-	if (g_ButtonAlpha >= MAX_ALPHA)
-	{
-		g_ButtonAlpha = MAX_ALPHA;
-		g_PulseDirection = -1;
-		pulse_speed = 0.4f;
-	}
-	else if (g_ButtonAlpha <= MIN_ALPHA)
-	{
-		g_ButtonAlpha = MIN_ALPHA;
-		g_PulseDirection = 1;
-		pulse_speed = 0.6f;
-	}
+	const float pulse = 0.5f + 0.5f * sinf(g_PulseTime * 6.0f);
+	const float pad = 5.0f + pulse * 4.0f;
+	const float glow = g_WasHovered ? 1.0f : 0.75f;
 
-	g_buttonParams.alpha = g_ButtonAlpha;
+	DrawRect(BTN_X - pad, BTN_Y - pad, BTN_W + pad * 2, BTN_H + pad * 2,
+		{ 0.45f, 0.85f, 1.00f }, (0.55f + pulse * 0.35f) * glow);
+
+	DrawRect(BTN_X, BTN_Y, BTN_W, BTN_H, { 0.10f, 0.11f, 0.14f }, 0.95f);
+
+	GameText_DrawCentered(BTN_X + BTN_W * 0.5f, BTN_Y + 26.0f,
+		"START", 0.70f, { 1.0f, 1.0f, 1.0f });
+
+	GameText_DrawCentered(SCREEN_WIDTH * 0.5f, BTN_Y + BTN_H + 60.0f,
+		"ENTER / CLICK  START", 0.42f, { 0.55f, 0.58f, 0.66f });
+
+	Sprite_SetFilter(kSpriteFilter_Point);
+	Sprite_Flush();
 }

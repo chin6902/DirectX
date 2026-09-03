@@ -28,6 +28,8 @@ enum SpriteFilter
 
 void Sprite_SetFilter(SpriteFilter filter);
 
+void Sprite_Flush();
+
 bool Sprite_Initialize();
 void Sprite_Finalize();
 

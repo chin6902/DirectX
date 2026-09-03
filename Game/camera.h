@@ -16,11 +16,13 @@ void Camera_Update(float delta_time);
 float Camera_GetX();
 float Camera_GetY();
 
-// world -> screen conversion (use in Draw functions only)
+// world -> screen conversion 
 float Camera_WorldToScreenX(float world_x);
 float Camera_WorldToScreenY(float world_y);
 
 float Camera_ScreenToWorldX(float screen_x);
 float Camera_ScreenToWorldY(float screen_y);
+
+void Camera_Shake(float strength, float duration);
 
 #endif

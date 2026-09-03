@@ -11,8 +11,6 @@ LastUpdate : 2026/08/15
 
 #include "game_player.h"
 #include "health.h"
-#include "texture.h"
-#include "sprite.h"
 #include "input_keyboard.h"
 #include "input_mouse.h"
 #include "config.h"
@@ -22,26 +20,31 @@ LastUpdate : 2026/08/15
 #include "game_progress.h"
 #include "collision_debug.h"
 #include "draw_primitives.h"
+#include "player_visual.h"
+#include "game_audio.h"
 
-#include "player_attack.h"
 #include "player_charge.h"
 
 using namespace DirectX;
 
-
-static constexpr float PLAYER_WIDTH = 96.0f;
-static constexpr float PLAYER_HEIGHT = 64.0f;
 static constexpr float PLAYER_COLLIDER_RADIUS = 25.6f;
 
-static constexpr float CHARGE_SPEED_MUL = 0.45f;   
-static constexpr float KNOCKBACK_FRICTION = 0.86f;  
+static constexpr float CHARGE_SPEED_MUL = 0.5f;   
+static constexpr float KNOCKBACK_FRICTION = 0.76f;  
 static constexpr float HIT_FLASH_TIME = 0.12f;
 
 
-static int     g_player_texture_ID = -1;
+static constexpr float PLAYER_DRAW_SIZE = 96.0f;
+static float g_AnimTimer = 0.0f;
+static int g_AnimFrame = 0;
+static int g_Facing = PLAYER_FACE_DOWN;
+static PlayerClip g_Clip = PLAYER_CLIP_IDLE;
+static bool g_IsMoving = false;
+static float g_CastFaceTimer = 0.0f;
 
 static Vector2 g_Pos;
 static Vector2 g_AimDir{ 1.0f, 0.0f };
+static Vector2 g_MoveDir{ 0.0f, 0.0f };
 
 // --- health ---
 static Health  g_Health;
@@ -69,6 +72,7 @@ static void SyncMaxHP();
 static void UpdateRegen(float delta_time);
 static void UpdateKnockback(float delta_time);
 static void UpdateMovement(float delta_time);
+static void UpdateAnim(float delta_time);
 
 static void ChangeState(PlayerState nextState)
 {
@@ -78,7 +82,7 @@ static void ChangeState(PlayerState nextState)
 
 void GamePlayer_Initialize(float startX, float startY)
 {
-	g_player_texture_ID = Texture_Load(L"assets/textures/player.png");
+	PlayerVisual_Initialize();
 
 	g_Pos = { startX, startY };
 	g_AimDir = { 1.0f, 0.0f };
@@ -93,19 +97,31 @@ void GamePlayer_Initialize(float startX, float startY)
 	g_ShieldCharges = 0;
 	g_State = PLAYER_STATE_NORMAL;
 
-	PlayerAttack_Initialize();
+	// --- animation ---
+	g_AnimTimer = 0.0f;
+	g_AnimFrame = 0;
+	g_Facing = PLAYER_FACE_DOWN;
+	g_Clip = PLAYER_CLIP_IDLE;
+	g_IsMoving = false;
+
 	PlayerCharge_Initialize();
 }
 
 void GamePlayer_Finalize()
 {
-	PlayerAttack_Finalize();
 	PlayerCharge_Finalize();
-	Texture_Release(g_player_texture_ID);
+	PlayerVisual_Finalize();
 }
 
 void GamePlayer_Update(float delta_time)
 {
+	if (g_Health.IsDead()) 
+	{
+		UpdateAnim(delta_time);
+	
+		return;
+	}
+
 	UpdateAim();
 	SyncMaxHP();
 
@@ -121,13 +137,17 @@ void GamePlayer_Update(float delta_time)
 	UpdateRegen(delta_time);
 	UpdateKnockback(delta_time);
 	UpdateMovement(delta_time);
+	UpdateAnim(delta_time);
 
 	PlayerCharge_UpdateAlways(delta_time);
 
 	if (InputKeyboard_IsTrigger(KK_SPACE))
 	{
 		PlayerCharge_TryRelease();
+		g_CastFaceTimer = 0.30f;
 	}
+
+	if (g_CastFaceTimer > 0.0f) { g_CastFaceTimer -= delta_time; }
 
 	switch (g_State)
 	{
@@ -185,7 +205,9 @@ static void UpdateMovement(float delta_time)
 	if (InputKeyboard_IsPress(KK_A)) { dir.x -= 1.0f; }
 	if (InputKeyboard_IsPress(KK_D)) { dir.x += 1.0f; }
 
-	if (dir.IsZero()) { return; }
+	if (dir.IsZero()) { g_IsMoving = false; g_MoveDir = { 0.0f, 0.0f }; return; }
+	g_IsMoving = true;
+	g_MoveDir = Vector2_Normalize(dir);
 
 	const float speed_mul = (g_State == PLAYER_STATE_CHARGING) ? CHARGE_SPEED_MUL : 1.0f;
 	const float speed = GameProgress_GetStat(STAT_MOVE_SPEED);
@@ -206,6 +228,47 @@ static void UpdateAim()
 	if (to_mouse.LengthSq() > 1.0f)  
 	{
 		g_AimDir = Vector2_Normalize(to_mouse);
+	}
+}
+
+static void UpdateAnim(float delta_time)
+{
+	const PlayerClip clip = g_Health.IsDead() ? PLAYER_CLIP_DEATH
+		: (g_IsMoving ? PLAYER_CLIP_RUN : PLAYER_CLIP_IDLE);
+
+	if (clip != g_Clip)
+	{
+		g_Clip = clip;
+		g_AnimFrame = 0;
+		g_AnimTimer = 0.0f;
+	}
+
+	if (clip != PLAYER_CLIP_DEATH)
+	{
+		const bool casting = (g_State == PLAYER_STATE_CHARGING) || (g_CastFaceTimer > 0.0f);
+		const Vector2 face_dir = casting ? g_AimDir : (g_IsMoving ? g_MoveDir : g_AimDir);
+		g_Facing = PlayerVisual_FacingSticky(face_dir, g_Facing);
+	}
+
+	const float ft = PlayerVisual_GetFrameTime(g_Clip);
+	if (ft <= 0.0f) { return; }
+
+	const int last = PlayerVisual_GetFrameCount(g_Clip) - 1;
+
+	if (!PlayerVisual_IsLooping(g_Clip) && g_AnimFrame >= last) { return; }
+
+	g_AnimTimer += delta_time;
+	while (g_AnimTimer >= ft)
+	{
+		g_AnimTimer -= ft;
+		if (PlayerVisual_IsLooping(g_Clip))
+		{
+			g_AnimFrame = (g_AnimFrame + 1) % (last + 1);
+		}
+		else if (g_AnimFrame < last)
+		{
+			g_AnimFrame++;
+		}
 	}
 }
 
@@ -263,7 +326,6 @@ bool  GamePlayer_IsInvincible() { return g_InvincTimer > 0.0f; }
 void GamePlayer_Draw()
 {
 	SpriteDrawParams p;
-	p.flip_x = (g_AimDir.x < 0.0f);
 
 	// hit flash
 	if (g_FlashTimer > 0.0f)
@@ -275,12 +337,7 @@ void GamePlayer_Draw()
 		p.alpha = (fmodf(g_InvincTimer, 0.16f) < 0.08f) ? 0.35f : 1.0f;
 	}
 
-	Sprite_Draw(
-		g_player_texture_ID,
-		Camera_WorldToScreenX(g_Pos.x - PLAYER_WIDTH * 0.5f),
-		Camera_WorldToScreenY(g_Pos.y - PLAYER_HEIGHT * 0.5f),
-		PLAYER_WIDTH, PLAYER_HEIGHT,
-		p);
+	PlayerVisual_Draw(g_Clip, g_AnimFrame, g_Facing, g_Pos, PLAYER_DRAW_SIZE, p);
 
 	// shield ring
 	if (GamePlayer_IsShielded())
@@ -290,7 +347,6 @@ void GamePlayer_Draw()
 		DrawPrim_Ring(g_Pos, 40.0f, 1.5f, { 1.0f, 1.0f, 1.0f }, 0.45f * fade);
 	}
 
-	PlayerAttack_Draw();
 	PlayerCharge_Draw();
 
 #ifdef _DEBUG
@@ -303,11 +359,11 @@ void GamePlayer_Draw()
 #endif
 }
 
-float   GamePlayer_GetPosX() { return g_Pos.x; }
-float   GamePlayer_GetPosY() { return g_Pos.y; }
+float GamePlayer_GetPosX() { return g_Pos.x; }
+float GamePlayer_GetPosY() { return g_Pos.y; }
 Vector2 GamePlayer_GetPos() { return g_Pos; }
 Vector2 GamePlayer_GetAimDir() { return g_AimDir; }
-float   GamePlayer_GetSpeed() { return GameProgress_GetStat(STAT_MOVE_SPEED); }
+float GamePlayer_GetSpeed() { return GameProgress_GetStat(STAT_MOVE_SPEED); }
 
 CollisionCircle GamePlayer_GetCollisionCircle()
 {

@@ -145,6 +145,45 @@
     <ClCompile Include="draw_primitives.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="game_expgem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="enemy_projectile.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="enemy_formation.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="game_boss.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="spatial_grid.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="game_damagenumber.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="flow_field.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="game_item.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="enemy_visual.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="player_visual.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="wave_banner.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="game_audio.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mouse_ui.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="debug_ostream.h">
@@ -283,6 +322,45 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="draw_primitives.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="game_expgem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="enemy_projectile.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="enemy_formation.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="game_boss.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="spatial_grid.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="game_damagenumber.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="flow_field.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="game_item.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="enemy_visual.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="player_visual.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="wave_banner.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="game_audio.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mouse_ui.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -1,178 +1,297 @@
+/*============================================================================
+Contents   :  [audio.cpp]
+
+Author     : Chin Qing You
+LastUpdate : 2026/08/27
+-----------------------------------------------------------------------------
+
+============================================================================*/
 #include <xaudio2.h>
 #include <assert.h>
+#include <cstdlib>
+#include <algorithm>
+
 #include "audio.h"
 
 #pragma comment(lib, "winmm.lib")
 
+static constexpr int AUDIO_MAX = 64;
+static constexpr int VOICES_PER_SOUND_MAX = 8;
+
+static constexpr float MAX_FREQ_RATIO = 4.0f;
+
 static IXAudio2* g_Xaudio{};
 static IXAudio2MasteringVoice* g_MasteringVoice{};
 
-
-void InitAudio()
+struct Sound
 {
-	// XAudio生成
-	XAudio2Create(&g_Xaudio, 0);
+	BYTE* data{};
+	int          length{};
+	int          play_length{};
+	WAVEFORMATEX wfx{};
 
-	// マスタリングボイス生成
-	g_Xaudio->CreateMasteringVoice(&g_MasteringVoice);
-}
+	IXAudio2SourceVoice* voices[VOICES_PER_SOUND_MAX]{};
+	int   voice_count{};
+	int   next_voice{};        
 
-
-void UninitAudio()
-{
-	g_MasteringVoice->DestroyVoice();
-	g_Xaudio->Release();
-}
-
-
-
-
-
-
-
-
-
-struct AUDIO
-{
-	IXAudio2SourceVoice*	SourceVoice{};
-	BYTE*					SoundData{};
-
-	int						Length{};
-	int						PlayLength{};
+	float min_retrigger{};     
+	float retrigger_timer{};
+	bool  is_music{};
+	bool  in_use{};
 };
 
-#define AUDIO_MAX 100
-static AUDIO g_Audio[AUDIO_MAX]{};
+static Sound g_Sounds[AUDIO_MAX]{};
 
+static float g_MasterVolume = 1.0f;
+static float g_SfxVolume = 1.0f;
+static float g_BgmVolume = 1.0f;
 
-
-int LoadAudio(const char *FileName)
+void Audio_Initialize()
 {
-	int index = -1;
+	XAudio2Create(&g_Xaudio, 0);
+	g_Xaudio->CreateMasteringVoice(&g_MasteringVoice);
 
+	for (Sound& s : g_Sounds) { s = {}; }
+
+	g_MasterVolume = 1.0f;
+	g_SfxVolume = 1.0f;
+	g_BgmVolume = 1.0f;
+}
+
+void Audio_Finalize()
+{
+	Audio_UnloadAll();
+
+	if (g_MasteringVoice) { g_MasteringVoice->DestroyVoice(); g_MasteringVoice = nullptr; }
+	if (g_Xaudio) { g_Xaudio->Release();              g_Xaudio = nullptr; }
+}
+
+void Audio_Update(float delta_time)
+{
+	for (Sound& s : g_Sounds)
+	{
+		if (s.in_use && s.retrigger_timer > 0.0f) { s.retrigger_timer -= delta_time; }
+	}
+}
+
+static bool LoadWav(const char* filename, Sound& out)
+{
+	HMMIO    hmmio = NULL;
+	MMIOINFO mmioinfo = { 0 };
+	MMCKINFO riffchunkinfo = { 0 };
+	MMCKINFO datachunkinfo = { 0 };
+	MMCKINFO mmckinfo = { 0 };
+
+	hmmio = mmioOpen((LPSTR)filename, &mmioinfo, MMIO_READ);
+	if (hmmio == NULL) { return false; }          
+
+	riffchunkinfo.fccType = mmioFOURCC('W', 'A', 'V', 'E');
+	mmioDescend(hmmio, &riffchunkinfo, NULL, MMIO_FINDRIFF);
+
+	mmckinfo.ckid = mmioFOURCC('f', 'm', 't', ' ');
+	mmioDescend(hmmio, &mmckinfo, &riffchunkinfo, MMIO_FINDCHUNK);
+
+	if (mmckinfo.cksize >= sizeof(WAVEFORMATEX))
+	{
+		mmioRead(hmmio, (HPSTR)&out.wfx, sizeof(out.wfx));
+	}
+	else
+	{
+		PCMWAVEFORMAT pcmwf = { 0 };
+		mmioRead(hmmio, (HPSTR)&pcmwf, sizeof(pcmwf));
+		memset(&out.wfx, 0x00, sizeof(out.wfx));
+		memcpy(&out.wfx, &pcmwf, sizeof(pcmwf));
+		out.wfx.cbSize = 0;
+	}
+	mmioAscend(hmmio, &mmckinfo, 0);
+
+	datachunkinfo.ckid = mmioFOURCC('d', 'a', 't', 'a');
+	mmioDescend(hmmio, &datachunkinfo, &riffchunkinfo, MMIO_FINDCHUNK);
+
+	const UINT32 buflen = datachunkinfo.cksize;
+	out.data = new unsigned char[buflen];
+	const LONG readlen = mmioRead(hmmio, (HPSTR)out.data, buflen);
+
+	out.length = readlen;
+	out.play_length = (out.wfx.nBlockAlign > 0) ? (readlen / out.wfx.nBlockAlign) : 0;
+
+	mmioClose(hmmio, 0);
+	return true;
+}
+
+int Audio_Load(const char* filename, int voice_count, float min_retrigger)
+{
+	if (filename == nullptr) { return -1; }   
+
+	int index = -1;
 	for (int i = 0; i < AUDIO_MAX; i++)
 	{
-		if (g_Audio[i].SourceVoice == nullptr)
-		{
-			index = i;
-			break;
-		}
+		if (!g_Sounds[i].in_use) { index = i; break; }
 	}
+	if (index < 0) { return -1; }
 
-	if (index == -1)
-		return -1;
+	Sound& s = g_Sounds[index];
+	s = {};
 
+	if (!LoadWav(filename, s)) { return -1; }
 
+	s.voice_count = std::clamp(voice_count, 1, VOICES_PER_SOUND_MAX);
+	s.min_retrigger = min_retrigger;
 
-
-	// サウンドデータ読込
-	WAVEFORMATEX wfx = { 0 };
-
+	for (int v = 0; v < s.voice_count; v++)
 	{
-		HMMIO hmmio = NULL;
-		MMIOINFO mmioinfo = { 0 };
-		MMCKINFO riffchunkinfo = { 0 };
-		MMCKINFO datachunkinfo = { 0 };
-		MMCKINFO mmckinfo = { 0 };
-		UINT32 buflen;
-		LONG readlen;
-
-
-		hmmio = mmioOpen((LPSTR)FileName, &mmioinfo, MMIO_READ);
-		assert(hmmio);
-
-		riffchunkinfo.fccType = mmioFOURCC('W', 'A', 'V', 'E');
-		mmioDescend(hmmio, &riffchunkinfo, NULL, MMIO_FINDRIFF);
-
-		mmckinfo.ckid = mmioFOURCC('f', 'm', 't', ' ');
-		mmioDescend(hmmio, &mmckinfo, &riffchunkinfo, MMIO_FINDCHUNK);
-
-		if (mmckinfo.cksize >= sizeof(WAVEFORMATEX))
-		{
-			mmioRead(hmmio, (HPSTR)&wfx, sizeof(wfx));
-		}
-		else
-		{
-			PCMWAVEFORMAT pcmwf = { 0 };
-			mmioRead(hmmio, (HPSTR)&pcmwf, sizeof(pcmwf));
-			memset(&wfx, 0x00, sizeof(wfx));
-			memcpy(&wfx, &pcmwf, sizeof(pcmwf));
-			wfx.cbSize = 0;
-		}
-		mmioAscend(hmmio, &mmckinfo, 0);
-
-		datachunkinfo.ckid = mmioFOURCC('d', 'a', 't', 'a');
-		mmioDescend(hmmio, &datachunkinfo, &riffchunkinfo, MMIO_FINDCHUNK);
-
-
-
-		buflen = datachunkinfo.cksize;
-		g_Audio[index].SoundData = new unsigned char[buflen];
-		readlen = mmioRead(hmmio, (HPSTR)g_Audio[index].SoundData, buflen);
-
-
-		g_Audio[index].Length = readlen;
-		g_Audio[index].PlayLength = readlen / wfx.nBlockAlign;
-
-
-		mmioClose(hmmio, 0);
+		g_Xaudio->CreateSourceVoice(&s.voices[v], &s.wfx, 0, MAX_FREQ_RATIO);
+		if (s.voices[v] == nullptr) { s.voice_count = v; break; }
 	}
 
+	if (s.voice_count == 0)
+	{
+		delete[] s.data;
+		s = {};
+		return -1;
+	}
 
-	// サウンドソース生成
-	g_Xaudio->CreateSourceVoice(&g_Audio[index].SourceVoice, &wfx);
-	assert(g_Audio[index].SourceVoice);
-
-
+	s.in_use = true;
 	return index;
 }
 
-
-
-
-void UnloadAudio(int Index)
+static bool ValidSound(int id)
 {
-	g_Audio[Index].SourceVoice->Stop();
-	g_Audio[Index].SourceVoice->DestroyVoice();
-
-	delete[] g_Audio[Index].SoundData;
-	g_Audio[Index].SoundData = nullptr;
+	return id >= 0 && id < AUDIO_MAX && g_Sounds[id].in_use;
 }
 
-
-
-
-
-void PlayAudio(int Index, bool Loop)
+void Audio_Unload(int sound_id)
 {
-	g_Audio[Index].SourceVoice->Stop();
-	g_Audio[Index].SourceVoice->FlushSourceBuffers();
+	if (!ValidSound(sound_id)) { return; }
+	Sound& s = g_Sounds[sound_id];
 
-
-	// バッファ設定
-	XAUDIO2_BUFFER bufinfo;
-
-	memset(&bufinfo, 0x00, sizeof(bufinfo));
-	bufinfo.AudioBytes = g_Audio[Index].Length;
-	bufinfo.pAudioData = g_Audio[Index].SoundData;
-	bufinfo.PlayBegin = 0;
-	bufinfo.PlayLength = g_Audio[Index].PlayLength;
-
-	// ループ設定
-	if (Loop)
+	for (int v = 0; v < s.voice_count; v++)
 	{
-		bufinfo.LoopBegin = 0;
-		bufinfo.LoopLength = g_Audio[Index].PlayLength;
-		bufinfo.LoopCount = XAUDIO2_LOOP_INFINITE;
+		if (s.voices[v] == nullptr) { continue; }
+		s.voices[v]->Stop();
+		s.voices[v]->FlushSourceBuffers();
+		s.voices[v]->DestroyVoice();
+		s.voices[v] = nullptr;
 	}
 
-	g_Audio[Index].SourceVoice->SubmitSourceBuffer(&bufinfo, NULL);
-
-
-	// 再生
-	g_Audio[Index].SourceVoice->Start();
-
+	delete[] s.data;
+	s = {};
 }
 
+void Audio_UnloadAll()
+{
+	for (int i = 0; i < AUDIO_MAX; i++) { Audio_Unload(i); }
+}
 
+void Audio_SetIsMusic(int sound_id, bool is_music)
+{
+	if (!ValidSound(sound_id)) { return; }
+	g_Sounds[sound_id].is_music = is_music;
+}
 
+// ============================================================================
+// Playback
+// ============================================================================
+static IXAudio2SourceVoice* PickVoice(Sound& s)
+{
+	for (int v = 0; v < s.voice_count; v++)
+	{
+		XAUDIO2_VOICE_STATE state{};
+		s.voices[v]->GetState(&state);
+		if (state.BuffersQueued == 0) { return s.voices[v]; }
+	}
+
+	IXAudio2SourceVoice* voice = s.voices[s.next_voice];
+	s.next_voice = (s.next_voice + 1) % s.voice_count;
+	return voice;
+}
+
+static float RandRange(float lo, float hi)
+{
+	const float t = (rand() % 1001) / 1000.0f;
+	return lo + (hi - lo) * t;
+}
+
+void Audio_Play(int sound_id, const AudioParams& params)
+{
+	if (!ValidSound(sound_id)) { return; }
+	Sound& s = g_Sounds[sound_id];
+
+	if (s.retrigger_timer > 0.0f) { return; }
+	s.retrigger_timer = s.min_retrigger;
+
+	IXAudio2SourceVoice* voice = PickVoice(s);
+	if (voice == nullptr) { return; }
+
+	voice->Stop();
+	voice->FlushSourceBuffers();
+
+	XAUDIO2_BUFFER buf{};
+	buf.AudioBytes = s.length;
+	buf.pAudioData = s.data;
+	buf.PlayBegin = 0;
+	buf.PlayLength = s.play_length;
+
+	if (params.loop)
+	{
+		buf.LoopBegin = 0;
+		buf.LoopLength = s.play_length;
+		buf.LoopCount = XAUDIO2_LOOP_INFINITE;
+	}
+
+	const float category = s.is_music ? g_BgmVolume : g_SfxVolume;
+	voice->SetVolume(params.volume * category * g_MasterVolume);
+
+	float ratio = params.pitch;
+	if (params.pitch_jitter > 0.0f)
+	{
+		ratio += RandRange(-params.pitch_jitter, params.pitch_jitter);
+	}
+	voice->SetFrequencyRatio(std::clamp(ratio, 1.0f / MAX_FREQ_RATIO, MAX_FREQ_RATIO));
+
+	voice->SubmitSourceBuffer(&buf, NULL);
+	voice->Start();
+}
+
+void Audio_Play(int sound_id)
+{
+	static const AudioParams defaults{};
+	Audio_Play(sound_id, defaults);
+}
+
+void Audio_Stop(int sound_id)
+{
+	if (!ValidSound(sound_id)) { return; }
+	Sound& s = g_Sounds[sound_id];
+
+	for (int v = 0; v < s.voice_count; v++)
+	{
+		if (s.voices[v] == nullptr) { continue; }
+		s.voices[v]->Stop();
+		s.voices[v]->FlushSourceBuffers();
+	}
+}
+
+void Audio_SetVolume(int sound_id, float volume)
+{
+	if (!ValidSound(sound_id)) { return; }
+	Sound& s = g_Sounds[sound_id];
+
+	const float category = s.is_music ? g_BgmVolume : g_SfxVolume;
+	const float final_volume = volume * category * g_MasterVolume;
+
+	for (int v = 0; v < s.voice_count; v++)
+	{
+		if (s.voices[v] == nullptr) { continue; }
+		s.voices[v]->SetVolume(final_volume);
+	}
+}
+
+void Audio_StopAll()
+{
+	for (int i = 0; i < AUDIO_MAX; i++) { Audio_Stop(i); }
+}
+
+void Audio_SetMasterVolume(float v) { g_MasterVolume = std::clamp(v, 0.0f, 1.0f); }
+void Audio_SetSfxVolume(float v) { g_SfxVolume = std::clamp(v, 0.0f, 1.0f); }
+void Audio_SetBgmVolume(float v) { g_BgmVolume = std::clamp(v, 0.0f, 1.0f); }

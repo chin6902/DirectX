@@ -13,9 +13,11 @@ LastUpdate : 2026/08/15
 
 void GameUI_Initialize();
 void GameUI_Finalize();
-void GameUI_Update(float delta_time);   // real time
+void GameUI_Update(float delta_time);
 void GameUI_Draw();
 
 void GameUI_Flash(const DirectX::XMFLOAT3& color, float duration);
+
+void GameUI_DrawScreenRect(float x, float y, float w, float h, const DirectX::XMFLOAT3& color, float alpha = 1.0f);
 
 #endif

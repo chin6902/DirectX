@@ -49,7 +49,6 @@ void PlayerAttack_Initialize()
 	g_SwingFlashTimer = 0.0f;
 	g_slash_active = false;
 
-	g_slash_texture_id = Texture_Load(L"assets/textures/slash2.png");
 	if (g_slash_texture_id != TEXTURE_INVALID_ID)
 	{
 		g_slash_anim_id = FlipBookAnimation_Create(
@@ -69,7 +68,6 @@ void PlayerAttack_Finalize()
 		g_slash_anim_id = -1;
 	}
 
-	Texture_Release(g_slash_texture_id);
 }
 
 void PlayerAttack_Update(float delta_time)

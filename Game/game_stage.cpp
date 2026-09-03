@@ -2,12 +2,13 @@
 Contents   :  [game_stage.cpp]
 
 Author     : Chin Qing You
-LastUpdate : 2026/07/27
+LastUpdate : 2026/08/20
 -----------------------------------------------------------------------------
 
 ============================================================================*/
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 
 #include "game_stage.h"
 #include "config.h"
@@ -16,43 +17,44 @@ LastUpdate : 2026/07/27
 #include "camera.h"
 #include "collision_debug.h"
 
-static int g_TextureId = -1;
+static int g_TextureBg = -1;   
+static int g_TextureStone = -1;   
 
-static constexpr int TILE_SIZE = 18;   // texel size of one tile in the sheet
-static constexpr int SHEET_COLS = 20;
-static constexpr int SHEET_ROWS = 9;
+static constexpr int STONE_TEX_W = 472;
+static constexpr int STONE_TEX_H = 474;
 
-// On-screen tile size (world pixels)
-static constexpr float DRAW_TILE_SIZE = 64.0f;
+static constexpr float DRAW_TILE_SIZE = 64.0f;   
 
-// ============================================================================
-// Level data — 3 screens each way (1600x900 screen / 64px tiles ~= 25x14)
-// ============================================================================
-static constexpr int MAP_WIDTH = 75;   // 4800 world px
-static constexpr int MAP_HEIGHT = 42;   // 2688 world px
+static constexpr int MAP_WIDTH = 75;   
+static constexpr int MAP_HEIGHT = 42;   
 
-// tile ID = row * SHEET_COLS + col   (-1 = empty, draw nothing)
-static int g_Map[MAP_HEIGHT][MAP_WIDTH];
-
-// --- Debug-map tile IDs: swap these for IDs that look right in YOUR sheet ---
 static constexpr int TILE_FLOOR = 0;
-static constexpr int TILE_WALL = 22;
+static constexpr int TILE_WALL = 1;
+
+static int g_Map[MAP_HEIGHT][MAP_WIDTH];
 
 static constexpr float COLLISION_SKIN = 0.05f;
 
-static void GenerateDebugMap();
-static void DrawTile(int tileId, float screenX, float screenY);
+static constexpr int QUADRANT_MARGIN = 5;    
+static constexpr int OBSTACLE_SPAN = 5;    
+
+enum ObstacleShape
+{
+	SHAPE_BLOCK,
+	SHAPE_L,
+	SHAPE_PLUS,
+	SHAPE_COUNT,
+};
+
+static void GenerateMap();
 
 static bool IsSolidTile(int tileId)
 {
-	// Grows into a switch / lookup table as the tileset grows.
 	return tileId == TILE_WALL;
 }
 
 static bool IsSolidCell(int tx, int ty)
 {
-	// Out-of-bounds counts as solid: nothing may leave the map,
-	// even if the wall ring is edited away later.
 	if (tx < 0 || tx >= MAP_WIDTH || ty < 0 || ty >= MAP_HEIGHT)
 	{
 		return true;
@@ -62,21 +64,102 @@ static bool IsSolidCell(int tx, int ty)
 
 void GameStage_Initialize()
 {
-	g_TextureId = Texture_Load(L"assets/textures/result.png");
+	g_TextureBg = Texture_Load(L"assets/textures/bg2.png", false);
+	g_TextureStone = Texture_Load(L"assets/textures/stone.png");
 
-	// Tier 1: generate the debug arena.
-	// Tier 2 (later): if assets/maps/stage01.csv exists, load it instead.
-	GenerateDebugMap();
+	GenerateMap();
 }
 
 void GameStage_Finalize()
 {
-	Texture_Release(g_TextureId);
+	Texture_Release(g_TextureBg);
+	Texture_Release(g_TextureStone);
 }
 
-static void GenerateDebugMap()
+static void SetWall(int tx, int ty)
 {
-	// 1. Carpet everything with floor
+	if (tx < 1 || tx >= MAP_WIDTH - 1) { return; }
+	if (ty < 1 || ty >= MAP_HEIGHT - 1) { return; }
+
+	g_Map[ty][tx] = TILE_WALL;
+}
+
+static void PlaceObstacle(int min_x, int min_y, int max_x, int max_y)
+{
+	const int span_x = std::max(1, max_x - min_x - OBSTACLE_SPAN);
+	const int span_y = std::max(1, max_y - min_y - OBSTACLE_SPAN);
+
+	const int x = min_x + rand() % span_x;
+	const int y = min_y + rand() % span_y;
+
+	const ObstacleShape shape = static_cast<ObstacleShape>(rand() % SHAPE_COUNT);
+
+	switch (shape)
+	{
+	case SHAPE_BLOCK:
+	{
+		const int w = 2 + rand() % 3;      
+		const int h = 2 + rand() % 3;
+
+		for (int ty = 0; ty < h; ++ty)
+		{
+			for (int tx = 0; tx < w; ++tx) { SetWall(x + tx, y + ty); }
+		}
+		break;
+	}
+
+	case SHAPE_L:
+	{
+		const int arm = 3 + rand() % 2;   
+		const int turn = rand() % 4;       // which corner the L opens toward
+
+		for (int i = 0; i < arm; ++i)
+		{
+			switch (turn)
+			{
+			case 0: 
+				SetWall(x + i, y);      
+				SetWall(x, y + i);      
+				break;
+			case 1:
+				SetWall(x + i, y);      
+				SetWall(x + arm - 1, y + i); 
+				break;
+			case 2: 
+				SetWall(x + i, y + arm - 1); 
+				SetWall(x, y + i);   
+				break;
+			default: 
+				SetWall(x + i, y + arm - 1);
+				SetWall(x + arm - 1, y + i); 
+				break;
+			}
+		}
+		break;
+	}
+
+	case SHAPE_PLUS:
+	default:
+	{
+		const int arm = 1 + rand() % 2;    // arm length either side of centre
+		const int cx = x + OBSTACLE_SPAN / 2;
+		const int cy = y + OBSTACLE_SPAN / 2;
+
+		SetWall(cx, cy);
+		for (int i = 1; i <= arm; ++i)
+		{
+			SetWall(cx + i, cy);
+			SetWall(cx - i, cy);
+			SetWall(cx, cy + i);
+			SetWall(cx, cy - i);
+		}
+		break;
+	}
+	}
+}
+
+static void GenerateMap()
+{
 	for (int y = 0; y < MAP_HEIGHT; ++y)
 	{
 		for (int x = 0; x < MAP_WIDTH; ++x)
@@ -85,7 +168,7 @@ static void GenerateDebugMap()
 		}
 	}
 
-	// 2. Wall ring — these tiles ARE the stage boundary now
+	// --- wall ring: these tiles ARE the stage boundary ---
 	for (int x = 0; x < MAP_WIDTH; ++x)
 	{
 		g_Map[0][x] = TILE_WALL;
@@ -97,39 +180,31 @@ static void GenerateDebugMap()
 		g_Map[y][MAP_WIDTH - 1] = TILE_WALL;
 	}
 
-	// 3. Test fixtures in the open field
-	//    2x2 pillar — circle around it, corner-slide against it
-	for (int y = 10; y < 12; ++y)
-	{
-		for (int x = 15; x < 17; ++x) { g_Map[y][x] = TILE_WALL; }
-	}
-	//    Horizontal bar — slide along it left/right
-	for (int x = 40; x < 46; ++x) { g_Map[20][x] = TILE_WALL; }
-	//    Vertical bar — slide along it up/down
-	for (int y = 25; y < 31; ++y) { g_Map[y][55] = TILE_WALL; }
+	// --- one obstacle per quadrant ---
+	const int mid_x = MAP_WIDTH / 2;
+	const int mid_y = MAP_HEIGHT / 2;
+	const int m = QUADRANT_MARGIN;
+
+	PlaceObstacle(m, m, mid_x - m, mid_y - m);							// top-left
+	PlaceObstacle(mid_x + m, m, MAP_WIDTH - m, mid_y - m);				// top-right
+	PlaceObstacle(m, mid_y + m, mid_x - m, MAP_HEIGHT - m);				// bottom-left
+	PlaceObstacle(mid_x + m, mid_y + m, MAP_WIDTH - m, MAP_HEIGHT - m); // bottom-right
 }
 
-static void DrawTile(int tileId, float screenX, float screenY)
-{
-	if (tileId < 0)
-	{
-		return;
-	}
-
-	const int col = tileId % SHEET_COLS;
-	const int row = tileId / SHEET_COLS;
-
-	Sprite_Draw(
-		g_TextureId,
-		screenX, screenY,
-		DRAW_TILE_SIZE, DRAW_TILE_SIZE,
-		static_cast<float>(col * TILE_SIZE),
-		static_cast<float>(row * TILE_SIZE),
-		TILE_SIZE, TILE_SIZE);
-}
-
+// ============================================================================
+// Draw
+// ============================================================================
 void GameStage_Draw()
 {
+	// --- floor
+	Sprite_Draw(
+		g_TextureBg,
+		0.0f, 0.0f,
+		static_cast<float>(SCREEN_WIDTH), static_cast<float>(SCREEN_HEIGHT),
+		Camera_GetX(), Camera_GetY(),
+		static_cast<int>(SCREEN_WIDTH), static_cast<int>(SCREEN_HEIGHT));
+
+	// --- walls
 	int startCol = static_cast<int>(Camera_GetX() / DRAW_TILE_SIZE);
 	int startRow = static_cast<int>(Camera_GetY() / DRAW_TILE_SIZE);
 	int endCol = startCol + static_cast<int>(SCREEN_WIDTH / DRAW_TILE_SIZE) + 2;
@@ -144,15 +219,15 @@ void GameStage_Draw()
 	{
 		for (int mx = startCol; mx < endCol; ++mx)
 		{
-			const int tileId = g_Map[my][mx];
-			if (tileId < 0)
-			{
-				continue;
-			}
+			if (!IsSolidTile(g_Map[my][mx])) { continue; }
 
-			DrawTile(tileId,
+			Sprite_Draw(
+				g_TextureStone,
 				Camera_WorldToScreenX(mx * DRAW_TILE_SIZE),
-				Camera_WorldToScreenY(my * DRAW_TILE_SIZE));
+				Camera_WorldToScreenY(my * DRAW_TILE_SIZE),
+				DRAW_TILE_SIZE, DRAW_TILE_SIZE,
+				0.0f, 0.0f,
+				STONE_TEX_W, STONE_TEX_H);
 		}
 	}
 }
@@ -168,18 +243,8 @@ bool GameStage_IsSolidAtWorld(float world_x, float world_y)
 }
 
 // ============================================================================
-// Collision resolve — circle vs solid tiles, one axis at a time
-//
-// The mover applies its FULL desired motion on one axis, we push it back
-// out of any solid tile on that axis only, then repeat for the other
-// axis. Because each axis is corrected independently, motion along a
-// wall survives: pressing up-right into a wall on the right kills only
-// the x part, and the mover slides upward. (Move-then-resolve.)
+// Collision resolve
 // ============================================================================
-
-// Does a circle at (cx,cy) overlap the solid tile (tx,ty)?
-// Standard circle-vs-AABB: clamp the centre into the rect to find the
-// closest point, then compare that distance to the radius.
 static bool CircleOverlapsTile(float cx, float cy, float radius, int tx, int ty)
 {
 	const float rect_min_x = tx * DRAW_TILE_SIZE;
@@ -187,6 +252,7 @@ static bool CircleOverlapsTile(float cx, float cy, float radius, int tx, int ty)
 	const float rect_max_x = rect_min_x + DRAW_TILE_SIZE;
 	const float rect_max_y = rect_min_y + DRAW_TILE_SIZE;
 
+	// circle vs AABB: clamp the centre into the rect for the closest point
 	const float closest_x = std::clamp(cx, rect_min_x, rect_max_x);
 	const float closest_y = std::clamp(cy, rect_min_y, rect_max_y);
 
@@ -207,13 +273,8 @@ static void GetOverlap(float cx, float cy, float radius, int tx, int ty,
 	overlap_y = std::min(cy + radius, rect_max_y) - std::max(cy - radius, rect_min_y);
 }
 
-// Resolve one axis. `pos` has already been moved on that axis;
-// `moved_positive` is the sign of the motion (needed to know which
-// tile edge to snap back to).
 static void ResolveAxisX(Vector2& pos, float radius)
 {
-	// Only tiles the circle's bounding box can touch need checking —
-	// same trick as the platformer CheckCollision, just per-axis.
 	const int min_tx = static_cast<int>((pos.x - radius) / DRAW_TILE_SIZE);
 	const int max_tx = static_cast<int>((pos.x + radius) / DRAW_TILE_SIZE);
 	const int min_ty = static_cast<int>((pos.y - radius) / DRAW_TILE_SIZE);
@@ -223,32 +284,22 @@ static void ResolveAxisX(Vector2& pos, float radius)
 	{
 		for (int tx = min_tx; tx <= max_tx; ++tx)
 		{
-			if (!IsSolidCell(tx, ty))
-			{
-				continue;
-			}
-
-			if (!CircleOverlapsTile(pos.x, pos.y, radius, tx, ty))
-			{
-				continue;
-			}
+			if (!IsSolidCell(tx, ty)) { continue; }
+			if (!CircleOverlapsTile(pos.x, pos.y, radius, tx, ty)) { continue; }
 
 			float overlap_x, overlap_y;
 			GetOverlap(pos.x, pos.y, radius, tx, ty, overlap_x, overlap_y);
-			if (overlap_y < overlap_x)
-			{
-				continue;   
-			}
+			if (overlap_y < overlap_x) { continue; }   
 
 			const float tile_center_x = (tx + 0.5f) * DRAW_TILE_SIZE;
 			if (pos.x < tile_center_x)
 			{
-				if (IsSolidCell(tx - 1, ty)) { continue; }   // left face is buried — not a real surface
+				if (IsSolidCell(tx - 1, ty)) { continue; }   
 				pos.x = tx * DRAW_TILE_SIZE - radius - COLLISION_SKIN;
 			}
 			else
 			{
-				if (IsSolidCell(tx + 1, ty)) { continue; }   // right face is buried
+				if (IsSolidCell(tx + 1, ty)) { continue; }
 				pos.x = (tx + 1) * DRAW_TILE_SIZE + radius + COLLISION_SKIN;
 			}
 		}
@@ -266,32 +317,22 @@ static void ResolveAxisY(Vector2& pos, float radius)
 	{
 		for (int tx = min_tx; tx <= max_tx; ++tx)
 		{
-			if (!IsSolidCell(tx, ty))
-			{
-				continue;
-			}
-
-			if (!CircleOverlapsTile(pos.x, pos.y, radius, tx, ty))
-			{
-				continue;
-			}
+			if (!IsSolidCell(tx, ty)) { continue; }
+			if (!CircleOverlapsTile(pos.x, pos.y, radius, tx, ty)) { continue; }
 
 			float overlap_x, overlap_y;
 			GetOverlap(pos.x, pos.y, radius, tx, ty, overlap_x, overlap_y);
-			if (overlap_x < overlap_y)
-			{
-				continue;   // shallow vertical graze — the Y pass owns this one
-			}
+			if (overlap_x < overlap_y) { continue; }   
 
 			const float tile_center_y = (ty + 0.5f) * DRAW_TILE_SIZE;
 			if (pos.y < tile_center_y)
 			{
-				if (IsSolidCell(tx, ty - 1)) { continue; }   // top face is buried — not a real surface
+				if (IsSolidCell(tx, ty - 1)) { continue; }  
 				pos.y = ty * DRAW_TILE_SIZE - radius - COLLISION_SKIN;
 			}
 			else
 			{
-				if (IsSolidCell(tx, ty + 1)) { continue; }   // bottom face is buried
+				if (IsSolidCell(tx, ty + 1)) { continue; }
 				pos.y = (ty + 1) * DRAW_TILE_SIZE + radius + COLLISION_SKIN;
 			}
 		}
@@ -315,7 +356,6 @@ Vector2 GameStage_ResolvePosition(const Vector2& old_pos,
 
 Vector2 GameStage_ClampPosition(const Vector2& pos, float radius)
 {
-	// Interior of the wall ring: one tile in from every edge.
 	const float margin = DRAW_TILE_SIZE + radius;
 	return {
 		std::clamp(pos.x, margin, GameStage_GetWidth() - margin),
@@ -323,10 +363,37 @@ Vector2 GameStage_ClampPosition(const Vector2& pos, float radius)
 	};
 }
 
+bool GameStage_TryGetObstacleSpawnPoint(float& out_x, float& out_y)
+{
+	for (int attempt = 0; attempt < 64; ++attempt)
+	{
+		const int tx = 2 + rand() % (MAP_WIDTH - 4);
+		const int ty = 2 + rand() % (MAP_HEIGHT - 4);
+
+		if (IsSolidTile(g_Map[ty][tx])) { continue; }   // must stand on floor
+
+		// accept only if a 4-neighbour is an interior obstacle 
+		const int nx[4] = { tx + 1, tx - 1, tx,     tx };
+		const int ny[4] = { ty,     ty,     ty + 1, ty - 1 };
+		bool near_obstacle = false;
+		for (int i = 0; i < 4; ++i)
+		{
+			const int cx = nx[i], cy = ny[i];
+			if (cx <= 0 || cx >= MAP_WIDTH - 1 || cy <= 0 || cy >= MAP_HEIGHT - 1) { continue; }
+			if (IsSolidTile(g_Map[cy][cx])) { near_obstacle = true; break; }
+		}
+		if (!near_obstacle) { continue; }
+
+		out_x = (tx + 0.5f) * DRAW_TILE_SIZE;
+		out_y = (ty + 0.5f) * DRAW_TILE_SIZE;
+		return true;
+	}
+	return false;
+}
+
 void GameStage_DebugDraw()
 {
 #ifdef _DEBUG
-	// Same cull as GameStage_Draw — only visible tiles
 	int startCol = std::max(static_cast<int>(Camera_GetX() / DRAW_TILE_SIZE), 0);
 	int startRow = std::max(static_cast<int>(Camera_GetY() / DRAW_TILE_SIZE), 0);
 	int endCol = std::min(startCol + static_cast<int>(SCREEN_WIDTH / DRAW_TILE_SIZE) + 2, MAP_WIDTH);
@@ -336,16 +403,14 @@ void GameStage_DebugDraw()
 	{
 		for (int mx = startCol; mx < endCol; ++mx)
 		{
-			if (!IsSolidTile(g_Map[my][mx]))
-			{
-				continue;
-			}
+			if (!IsSolidTile(g_Map[my][mx])) { continue; }
 
-			// One circle inscribed in each SOLID tile — magenta = "collision says wall"
 			const float cx = (mx + 0.5f) * DRAW_TILE_SIZE;
 			const float cy = (my + 0.5f) * DRAW_TILE_SIZE;
+
 			Collision_Debug_Draw(
-				{ { Camera_WorldToScreenX(cx), Camera_WorldToScreenY(cy) }, DRAW_TILE_SIZE * 0.5f },
+				{ { Camera_WorldToScreenX(cx), Camera_WorldToScreenY(cy) },
+				  DRAW_TILE_SIZE * 0.5f },
 				{ 1.0f, 0.0f, 1.0f });
 		}
 	}

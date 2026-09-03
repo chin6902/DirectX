@@ -17,7 +17,7 @@ void DrawPrim_Initialize();
 void DrawPrim_Finalize();
 
 void DrawPrim_Line(const Vector2& from, const Vector2& to, float thickness,
-    const DirectX::XMFLOAT3& color, float alpha = 1.0f);
+    const DirectX::XMFLOAT3& color, float alpha, float overlap = 1.0f);
 
 void DrawPrim_Beam(const Vector2& from, const Vector2& to, float thickness,
     const DirectX::XMFLOAT3& color, float alpha = 1.0f);

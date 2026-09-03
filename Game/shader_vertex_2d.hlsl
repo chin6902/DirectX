@@ -1,32 +1,30 @@
 // Constant buffer
-cbuffer MatrixBuffer : register(b0)
+cbuffer ProjectionBuffer : register(b0)
 {
-    float4x4 mtx; // 4byte * 4
-}
-
-cbuffer UVMatrixBuffer : register(b1)
-{
-    float4x4 mtx_uv;
+	float4x4 projection;
 };
 
-struct VS_INPUT
+struct VS_IN
 {
-    float4 posL : POSITION0;
-    float2 uv : TEXCOORD0;
+	float3 position : POSITION0;
+	float2 uv       : TEXCOORD0;
+	float4 color    : COLOR0;
 };
 
-struct VS_OUTPUT
+struct VS_OUT
 {
-    float4 posH : SV_POSITION;
-    float2 uv : TEXCOORD0;
+	float4 position : SV_POSITION;
+	float2 uv       : TEXCOORD0;
+	float4 color    : COLOR0;
 };
 
-VS_OUTPUT main( VS_INPUT input )
+VS_OUT main(VS_IN input)
 {
-	VS_OUTPUT output;
-    
-	output.posH = mul(input.posL, mtx);
-    output.uv = mul(float4(input.uv, 0.0f, 1.0f), mtx_uv).xy;
-    
+	VS_OUT output;
+
+	output.position = mul(float4(input.position, 1.0f), projection);
+	output.uv       = input.uv;
+	output.color    = input.color;   // tint travels per-vertex now
+
 	return output;
 }

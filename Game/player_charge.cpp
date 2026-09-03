@@ -16,6 +16,9 @@ LastUpdate : 2026/08/16
 #include "input_mouse.h"
 #include "camera.h"
 #include "draw_primitives.h"
+#include "game_enemy.h"
+#include "game_item.h"
+#include "game_audio.h"
 
 using namespace DirectX;
 
@@ -25,7 +28,7 @@ static int         g_SlotCount = 0;
 static int         g_Charging = ELEMENT_NONE;
 static float       g_ChargeTimer = 0.0f;
 
-static constexpr float CHARGE_TIME_BASE = 1.2f;
+static constexpr float CHARGE_TIME_BASE = 1.1f;
 
 // --- ultimate meter ---
 static constexpr int   ULTIMATE_SLOTS_NEEDED = 9;
@@ -43,6 +46,8 @@ static constexpr float SLOT_SPACING = 26.0f;
 static constexpr float SLOT_HEIGHT = 60.0f;    
 static constexpr float RING_MIN = 12.0f;
 static constexpr float RING_GROWTH = 44.0f;
+
+static void PlayChargeSound();
 
 static int GetHeldElement()
 {
@@ -83,7 +88,10 @@ void PlayerCharge_Initialize()
 	for (int e = 0; e < ELEMENT_TYPE_COUNT; e++) { g_UltimateSpent[e] = 0; }
 }
 
-void PlayerCharge_Finalize() {}
+void PlayerCharge_Finalize() 
+{
+
+}
 
 bool PlayerCharge_IsChargeKeyHeld() { return CanCharge(GetHeldElement()); }
 int  PlayerCharge_GetSlotCount() { return g_SlotCount; }
@@ -103,15 +111,18 @@ void PlayerCharge_Update(float delta_time)
 	{
 		g_Charging = held;
 		g_ChargeTimer = 0.0f;
+		PlayChargeSound();
 	}
 
-	const float charge_time = CHARGE_TIME_BASE * GameProgress_GetChargeTimeMul();
+	const float charge_time = CHARGE_TIME_BASE * GameProgress_GetChargeTimeMul() * GameItem_GetChargeTimeMul();
 
 	g_ChargeTimer += delta_time;
 	if (g_ChargeTimer >= charge_time)
 	{
 		g_Slots[g_SlotCount++] = static_cast<ElementType>(g_Charging);
 		g_ChargeTimer -= charge_time;
+
+		if (CanCharge(g_Charging)) { PlayChargeSound(); }
 	}
 }
 
@@ -173,10 +184,18 @@ bool PlayerCharge_TryRelease()
 		power += counts[e] * GameProgress_GetElementLevel(static_cast<ElementType>(e));
 	}
 
+	unsigned int element_mask = 0;
+	for (int e = 0; e < ELEMENT_TYPE_COUNT; e++)
+	{
+		if (counts[e] > 0) { element_mask |= ElementBit(static_cast<ElementType>(e)); }
+	}
+
+
 	GameSkill_Cast(id,
 		Vector2{ GamePlayer_GetPosX(), GamePlayer_GetPosY() },
 		GamePlayer_GetAimDir(),
-		std::max(1, power));
+		std::max(1, power),
+		element_mask);
 
 	FeedUltimateMeter(counts);
 
@@ -207,6 +226,12 @@ ElementType PlayerCharge_GetUltimateElement()
 		}
 	}
 	return best;
+}
+
+static void PlayChargeSound()
+{
+	const float charge_mul = GameProgress_GetChargeTimeMul() * GameItem_GetChargeTimeMul();
+	GameAudio_PlayPitched(SND_CHARGE, 1.0f / std::max(0.25f, charge_mul));
 }
 
 // ============================================================================
@@ -249,7 +274,7 @@ void PlayerCharge_Draw()
 	// --- charge progress ---
 	if (g_Charging != ELEMENT_NONE)
 	{
-		const float charge_time = CHARGE_TIME_BASE * GameProgress_GetChargeTimeMul();
+		const float charge_time = CHARGE_TIME_BASE * GameProgress_GetChargeTimeMul() * GameItem_GetChargeTimeMul();
 		const float t = std::min(g_ChargeTimer / charge_time, 1.0f);
 		const XMFLOAT3 col = ElementColor(g_Charging);
 

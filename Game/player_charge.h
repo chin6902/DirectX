@@ -16,7 +16,7 @@ static constexpr int CHARGE_SLOT_MAX = 3;
 void PlayerCharge_Initialize();
 void PlayerCharge_Finalize();
 void PlayerCharge_Update(float delta_time);  
-void PlayerCharge_Draw();                      // slot UI
+void PlayerCharge_Draw();                      
 
 bool PlayerCharge_IsChargeKeyHeld();      
 bool PlayerCharge_TryRelease();               

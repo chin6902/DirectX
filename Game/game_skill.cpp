@@ -4,7 +4,7 @@ Contents   :  [game_skill.cpp]
 Author     : Chin Qing You
 LastUpdate : 2026/08/16
 -----------------------------------------------------------------------------
-
+The grid must be built before skills query it(SpatialGrid_Insert)
 ============================================================================*/
 #include <algorithm>
 #include <cmath>
@@ -24,10 +24,15 @@ LastUpdate : 2026/08/16
 #include "collision.h"
 #include "collision_debug.h"
 #include "draw_primitives.h"
+#include "game_boss.h"
+#include "game_damagenumber.h"
+#include "game_item.h"
+#include "game_audio.h"
 
 using namespace DirectX;
 
 static constexpr float TWO_PI = 6.2831853f;
+static constexpr int BOSS_TARGET_ID = -1;
 
 struct SkillRecipe
 {
@@ -75,6 +80,19 @@ SkillId GameSkill_Lookup(const int* counts)
 	return SKILL_NONE;
 }
 
+static constexpr SoundId g_UltimateVoice[ELEMENT_TYPE_COUNT] =
+{
+	SND_ULT_FIRE,
+	SND_ULT_ICE,
+	SND_ULT_ELECTRIC,
+};
+
+static SoundId UltimateVoice(ElementType e)
+{
+	if (e < 0 || e >= ELEMENT_TYPE_COUNT) { return SND_NONE; }
+	return g_UltimateVoice[e];
+}
+
 enum MotionMode
 {
 	MOTION_STATIC,         
@@ -102,6 +120,9 @@ enum DrawStyle
 	DRAW_RING,
 	DRAW_TESLA,
 };
+
+static constexpr float ORBIT_RETURN_TIME = 0.28f;
+static constexpr float DIVE_TIMEOUT = 1.20f;
 
 struct MotionSpec
 {
@@ -172,12 +193,30 @@ struct SkillDef
 	XMFLOAT3    color = { 1.0f, 1.0f, 1.0f };
 	float       hitstop = 0.0f;
 	DrawStyle   draw_style = DRAW_ORB;
+	bool        draw_under = false;
 	bool        trail = false;    
 	int         max_instances = 0;        
 
 	float       shield_time = 0.0f;
 	int         shield_charges = 0;
+
+	float       fall_distance = 0.0f;
+	float       fall_angle = 0.0f;
+	float       fall_spread = 0.0f;
+	float       fall_radius = 22.0f;
+
+	SoundId     sound = SND_NONE;
+	float       sound_pitch = 1.0f;
+	SoundId     hit_sound = SND_NONE;
+	float       hit_pitch = 1.0f;
 };
+
+static SkillId      g_PendingId = SKILL_NONE;
+static float        g_PendingDelay = 0.0f;
+static Vector2      g_PendingOrigin;
+static Vector2      g_PendingAim;
+static int          g_PendingPower = 0;
+static unsigned int g_PendingMask = 0;
 
 static constexpr SkillDef g_SkillDefs[SKILL_ID_COUNT] =
 {
@@ -188,9 +227,11 @@ static constexpr SkillDef g_SkillDefs[SKILL_ID_COUNT] =
 		.motion = {.mode = MOTION_LINEAR, .speed = 900.0f },
 		.life = 0.40f,
 		.hitbox = {.radius = 16.0f },
-		.impact = {.damage_mul = 1.0f, .kb_speed = 260.0f, .kb_time = 0.15f, .stun_time = 0.10f },
+		.impact = {.damage_mul = 1.5f, .kb_speed = 260.0f, .kb_time = 0.15f, .stun_time = 0.10f },
 		.color = { 1.00f, 0.45f, 0.10f },
 		.trail = true,
+		.sound = SND_CAST_FIRE,
+		.sound_pitch = 1.15f,
 	},
 
 	/* 1 ICE_SHARD  */
@@ -199,10 +240,12 @@ static constexpr SkillDef g_SkillDefs[SKILL_ID_COUNT] =
 		.motion = {.mode = MOTION_LINEAR, .speed = 520.0f },
 		.life = 1.60f,
 		.hitbox = {.radius = 14.0f },
-		.impact = {.damage_mul = 0.5f, .kb_speed = 100.0f, .kb_time = 0.10f, .stun_time = 0.20f },
+		.impact = {.damage_mul = 1.0f, .kb_speed = 100.0f, .kb_time = 0.10f, .stun_time = 0.20f },
 		.status = { { STATUS_SLOW, 2.5f, 0.45f } },
 		.color = { 0.35f, 0.75f, 1.00f },
 		.trail = true,
+		.sound = SND_CAST_ICE,
+		.sound_pitch = 0.70f,
 	},
 
 	/* 2 SPARK */
@@ -212,33 +255,39 @@ static constexpr SkillDef g_SkillDefs[SKILL_ID_COUNT] =
 		.life = 0.35f,
 		.hitbox = {.radius = 12.0f },
 		.target = {.chain_jumps = 1, .chain_range = 200.0f, .falloff = 0.5f, .min_damage_mul = 0.1f },
-		.impact = {.damage_mul = 0.5f, .kb_speed = 150.0f, .kb_time = 0.10f, .stun_time = 0.15f },
+		.impact = {.damage_mul = 1.0f, .kb_speed = 150.0f, .kb_time = 0.10f, .stun_time = 0.15f },
 		.color = { 1.00f, 0.90f, 0.30f },
 		.trail = true,
+		.sound = SND_CAST_THUNDER,
+		.sound_pitch = 1.20f,
 	},
 
 	// =========================================================== 2 SLOTS
 	/* 3 FLAME_NOVA */
 	{
 		.element = ELEMENT_FIRE,
-		.life = 0.35f,
-		.hitbox = {.radius = 170.0f, .grow = true },
-		.impact = {.damage_mul = 1.5f, .kb_speed = 450.0f, .kb_time = 0.25f, .stun_time = 0.25f },
-		.color = { 1.00f, 0.30f, 0.05f },
-		.draw_style = DRAW_RING,
+			.life = 0.35f,
+			.hitbox = { .radius = 180.0f, .grow = true },
+			.impact = { .damage_mul = 1.3f, .kb_speed = 450.0f, .kb_time = 0.25f, .stun_time = 0.25f },
+			.color = { 1.00f, 0.30f, 0.05f },
+			.draw_style = DRAW_RING,
+			.sound = SND_CAST_FIRE,
+			.sound_pitch = 0.90f,
 	},
 
-	/* 4 FROST_LANCE */
+		/* 4 FROST_LANCE */
 	{
 		.element = ELEMENT_ICE,
 		.motion = {.mode = MOTION_LINEAR, .speed = 700.0f },
 		.life = 1.20f,
 		.hitbox = {.radius = 20.0f },
 		.target = {.max_pierce = 8 },
-		.impact = {.damage_mul = 1.0f, .kb_speed = 140.0f, .kb_time = 0.12f, .stun_time = 0.20f },
+		.impact = {.damage_mul = 0.8f, .kb_speed = 140.0f, .kb_time = 0.12f, .stun_time = 0.20f },
 		.status = { { STATUS_SLOW, 3.0f, 0.35f } },
 		.color = { 0.55f, 0.85f, 1.00f },
 		.trail = true,
+		.sound = SND_CAST_ICE,
+		.sound_pitch = 1.10f,
 	},
 
 	/* 5 CHAIN_BOLT */
@@ -251,6 +300,8 @@ static constexpr SkillDef g_SkillDefs[SKILL_ID_COUNT] =
 		.impact = {.damage_mul = 1.0f, .kb_speed = 200.0f, .kb_time = 0.12f, .stun_time = 0.18f },
 		.color = { 1.00f, 0.95f, 0.45f },
 		.trail = true,
+		.sound = SND_CAST_THUNDER,
+		.sound_pitch = 1.05f,
 	},
 
 	/* 6 STEAM_BURST */
@@ -263,20 +314,26 @@ static constexpr SkillDef g_SkillDefs[SKILL_ID_COUNT] =
 		.child = { SKILL_STEAM_CLOUD, SPAWN_ON_HIT },
 		.color = { 0.85f, 0.70f, 0.85f },
 		.trail = true,
+		.sound = SND_CAST_FIRE,
+		.sound_pitch = 0.95f,
 	},
 
 	/* 7 OVERLOAD  */
 	{
 		.element = ELEMENT_THUNDER,
-		.motion = {.mode = MOTION_ORBIT_SEEK, .speed = 720.0f, .orbit_radius = 80.0f,
-					 .spin_speed = 2.8f, .count = 1, .seek_range = 300.0f },
+		.motion = {.mode = MOTION_ORBIT_SEEK, .speed = 720.0f, .orbit_radius = 80.0f, .spin_speed = 2.8f, .count = 1, .seek_range = 300.0f },
 		.life = 10.00f,
 		.hitbox = {.radius = 20.0f },
 		.target = {.hit_interval = 1.50f },
 		.impact = {.damage_mul = 1.5f, .kb_speed = 220.0f, .kb_time = 0.12f, .stun_time = 0.20f },
-		.status = { { STATUS_BURN, 2.0f, 0.5f } },
+		.status = { { STATUS_BURN, 2.0f, 1.0f } },
 		.color = { 1.00f, 0.75f, 0.35f },
 		.trail = true,
+		.max_instances = 2,
+		.sound = SND_SUMMON,
+		.sound_pitch = 1.00f,
+		.hit_sound = SND_CAST_FIRE,
+		.hit_pitch = 0.80f,
 	},
 
 	/* 8 STATIC_FROST */
@@ -285,11 +342,13 @@ static constexpr SkillDef g_SkillDefs[SKILL_ID_COUNT] =
 		.motion = {.mode = MOTION_LINEAR, .speed = 900.0f },
 		.life = 0.55f,
 		.hitbox = {.radius = 15.0f },
-		.target = {.chain_jumps = 2, .chain_range = 210.0f, .falloff = 0.5f, .min_damage_mul = 0.1f },
+		.target = {.chain_jumps = 3, .chain_range = 210.0f, .falloff = 0.6f, .min_damage_mul = 0.1f },
 		.impact = {.damage_mul = 1.0f, .kb_speed = 120.0f, .kb_time = 0.10f, .stun_time = 0.15f },
 		.status = { { STATUS_SLOW, 2.5f, 0.5f } },
 		.color = { 0.65f, 0.90f, 0.95f },
 		.trail = true,
+		.sound = SND_CAST_ICE,
+		.sound_pitch = 0.90f,
 	},
 
 	// =========================================================== 3 SLOTS
@@ -297,12 +356,17 @@ static constexpr SkillDef g_SkillDefs[SKILL_ID_COUNT] =
 	{
 		.element = ELEMENT_FIRE,
 		.motion = {.mode = MOTION_AT_CURSOR },
-		.life = 0.80f,
+		.life = 1.35f,
 		.spawn_delay = 999.0f,
 		.hitbox = {.radius = 150.0f },
 		.impact = {.damage_mul = 0.0f },
 		.child = { SKILL_BIG_METEOR_IMPACT, SPAWN_ON_EXPIRE },
 		.color = { 1.00f, 0.35f, 0.05f },
+		.fall_distance = 180.0f,
+		.fall_angle = -1.05f,
+		.fall_radius = 40.0f,
+		.sound = SND_CAST_FIRE,
+		.sound_pitch = 1.0f,
 	},
 
 	/* 10 ABSOLUTE_ZERO */
@@ -310,11 +374,13 @@ static constexpr SkillDef g_SkillDefs[SKILL_ID_COUNT] =
 		.element = ELEMENT_ICE,
 		.life = 0.50f,
 		.hitbox = {.grow = true, .screen_wide = true },
-		.impact = {.damage_mul = 1.0f },
+		.impact = {.damage_mul = 0.5f },
 		.status = { { STATUS_FREEZE, 1.0f, 0.0f } },
-		.color = { 0.70f, 0.95f, 1.00f },
+		.color = { 0.80f, 0.99f, 1.00f },
 		.hitstop = 0.08f,
 		.draw_style = DRAW_RING,
+		.sound = SND_FREEZE,
+		.sound_pitch = 0.85f,
 	},
 
 	/* 11 TESLA_TURRET */
@@ -322,11 +388,13 @@ static constexpr SkillDef g_SkillDefs[SKILL_ID_COUNT] =
 		.element = ELEMENT_THUNDER,
 		.life = 6.00f,
 		.hitbox = {.radius = 200.0f },
-		.target = {.hit_interval = 0.50f, .chain_jumps = 2, .chain_range = 170.0f, .falloff = 0.3f, .min_damage_mul = 0.1f },
-		.impact = {.damage_mul = 0.75f, .kb_speed = 110.0f, .kb_time = 0.08f, .stun_time = 0.10f },
+		.target = {.hit_interval = 0.60f, .chain_jumps = 2, .chain_range = 170.0f, .falloff = 0.4f, .min_damage_mul = 0.1f },
+		.impact = {.damage_mul = 0.5f, .kb_speed = 110.0f, .kb_time = 0.08f, .stun_time = 0.10f },
 		.color = { 0.85f, 0.85f, 1.00f },
 		.draw_style = DRAW_TESLA,
 		.max_instances = 2,
+		.sound = SND_SUMMON,
+		.sound_pitch = 1.00f,
 	},
 
 	/* 12 MAGMA_FIELD */
@@ -335,25 +403,29 @@ static constexpr SkillDef g_SkillDefs[SKILL_ID_COUNT] =
 		.life = 0.40f,
 		.hitbox = {.radius = 80.0f, .grow = true },
 		.impact = {.damage_mul = 0.5f, .kb_speed = 380.0f, .kb_time = 0.22f, .stun_time = 0.25f },
-		.status = { { STATUS_BURN, 0.5f, 1.0f } },
+		.status = { { STATUS_BURN, 2.0f, 0.5f } },
 		.child = { SKILL_MAGMA_GROUND, SPAWN_ON_EXPIRE },
 		.color = { 1.00f, 0.35f, 0.05f },
 		.hitstop = 0.05f,
 		.draw_style = DRAW_RING,
+		.sound = SND_CAST_FIRE,
+		.sound_pitch = 0.75f,
 	},
 
 	/* 13 FROSTFIRE_SPIKES */
 	{
 		.element = ELEMENT_ICE,
-		.motion = {.count = 3, .spread = 0.5236f },   // 30 deg apart
+		.motion = {.count = 3, .spread = 0.5236f },   
 		.life = 1.00f,
 		.spawn_delay = 0.12f,                            
 		.hitbox = {.length = 300.0f, .thickness = 26.0f },
-		.impact = {.damage_mul = 1.0f, .kb_speed = 260.0f, .kb_time = 0.18f, .stun_time = 0.25f },
-		.status = { { STATUS_SLOW, 2.5f, 0.5f } }, 
+		.impact = {.damage_mul = 1.5f, .kb_speed = 260.0f, .kb_time = 0.5f, .stun_time = 0.25f },
+		.status = { { STATUS_SLOW, 2.5f, 0.4f } }, 
 		.color = { 0.16f, 0.28f, 0.85f },         
-		.hitstop = 0.10f,
+		.hitstop = 0.15f,
 		.draw_style = DRAW_DOTS,
+		.sound = SND_CAST_ICE,
+		.sound_pitch = 1.20f,
 	},
 
 	/* 14 FIRESTORM */
@@ -366,20 +438,26 @@ static constexpr SkillDef g_SkillDefs[SKILL_ID_COUNT] =
 		.child = { SKILL_WHIRLPOOL, SPAWN_ON_HIT },
 		.color = { 1.00f, 0.55f, 0.15f },
 		.trail = true,
+		.sound = SND_CAST_FIRE,
+		.sound_pitch = 0.85f,
 	},
 
 	/* 15 PLASMA_ORBS */
 	{
 		.element = ELEMENT_THUNDER,
 		.motion = {.mode = MOTION_ORBIT, .orbit_radius = 90.0f, .spin_speed = 2.5f, .count = 3 },
-		.life = 5.00f,
+		.life = 7.00f,
 		.hitbox = {.radius = 16.0f },
-		.target = {.hit_interval = 0.15f },
-		.impact = {.damage_mul = 0.5f, .kb_speed = 120.0f, .kb_time = 0.08f, .stun_time = 0.06f },
-		.status = { { STATUS_BURN, 1.5f, 1.0f } },
+		.target = {.hit_interval = 0.25f },
+		.impact = {.damage_mul = 0.3f, .kb_speed = 120.0f, .kb_time = 0.08f, .stun_time = 0.06f },
+		.status = { { STATUS_BURN, 2.0f, 0.5f } },
 		.color = { 1.00f, 0.65f, 0.35f },
 		.trail = true,
 		.max_instances = 1,
+		.sound = SND_SUMMON,
+		.sound_pitch = 1.10f,
+		.hit_sound = SND_CAST_FIRE,
+		.hit_pitch = 0.70f,
 	},
 
 	/* 16 GLACIAL_ORBS */
@@ -387,40 +465,50 @@ static constexpr SkillDef g_SkillDefs[SKILL_ID_COUNT] =
 		.element = ELEMENT_ICE,
 		.motion = {.mode = MOTION_ORBIT_SEEK, .speed = 620.0f, .orbit_radius = 85.0f, .spin_speed = 2.2f, .count = 2, .seek_range = 280.0f },
 		.life = 7.00f,
-		.hitbox = {.radius = 22.0f },
+		.hitbox = {.radius = 20.0f },
 		.target = {.hit_interval = 2.20f },
-		.impact = {.damage_mul = 0.5f, .kb_speed = 180.0f, .kb_time = 0.12f, .stun_time = 0.20f },
-		.status = { { STATUS_SLOW, 2.0f, 0.5f } },
+		.impact = {.damage_mul = 0.3f, .kb_speed = 180.0f, .kb_time = 0.12f, .stun_time = 0.20f },
+		.status = { { STATUS_SLOW, 2.0f, 0.6f } },
 		.child = { SKILL_FROST_BURST, SPAWN_ON_HIT },
 		.color = { 0.60f, 0.90f, 1.00f },
 		.trail = true,
 		.max_instances = 1,
+		.sound = SND_SUMMON,
+		.sound_pitch = 0.90f,
+		.hit_sound = SND_CAST_ICE,
+		.hit_pitch = 0.80f,
 	},
 
 	/* 17 STORMFREEZE */
 	{
 		.element = ELEMENT_THUNDER,
 		.motion = {.mode = MOTION_FOLLOW_CURSOR, .speed = 900.0f, .count = 1 },
-		.life = 8.00f,
+		.life = 7.00f,
 		.hitbox = {.radius = 30.0f },
-		.target = {.hit_interval = 0.20f },
-		.impact = {.damage_mul = 1.0f, .kb_speed = 90.0f, .kb_time = 0.08f, .stun_time = 0.10f },
+		.target = {.hit_interval = 0.25f },
+		.impact = {.damage_mul = 0.1f, .kb_speed = 90.0f, .kb_time = 0.08f, .stun_time = 0.10f },
 		.status = { { STATUS_SLOW, 1.2f, 0.55f } },
 		.color = { 0.70f, 0.85f, 1.00f },
 		.trail = true,
 		.max_instances = 1,
+		.sound = SND_CAST_ICE,
+		.sound_pitch = 1.30f,
+		.hit_sound = SND_BLIZZARD,
+		.hit_pitch = 0.80f,
 	},
 
-	/* 18 PRISM */
+	/* 18 PRISM  barrier */
 	{
 		.element = ELEMENT_FIRE,
-		.life = 10.00f,
+		.life = 15.00f,
 		.hitbox = {.radius = 42.0f }, 
 		.impact = {.damage_mul = 0.0f },
 		.color = { 0.85f, 0.92f, 1.00f },
 		.draw_style = DRAW_RING,
 		.shield_time = 10.0f,
 		.shield_charges = 1,
+		.sound = SND_SUMMON,
+		.sound_pitch = 0.70f,
 	},
 
 	// =========================================================== ULTIMATES
@@ -428,25 +516,37 @@ static constexpr SkillDef g_SkillDefs[SKILL_ID_COUNT] =
 	{
 		.element = ELEMENT_FIRE,
 		.motion = {.mode = MOTION_AT_CURSOR, .count = 4, .scatter = 150.0f, .stagger = 0.18f },
-		.life = 0.70f,
-		.spawn_delay = 999.0f,
+		.life = 0.55f,
+		.spawn_delay = 0.70f,
 		.hitbox = {.radius = 80.0f },
 		.impact = {.damage_mul = 0.0f },
 		.child = { SKILL_METEOR_IMPACT, SPAWN_ON_EXPIRE },
 		.color = { 1.00f, 0.40f, 0.10f },
+		.fall_distance = 130.0f,
+		.fall_angle = -1.05f,
+		.fall_spread = 0.85f,           
+		.fall_radius = 17.0f,
+		.sound = SND_CAST_FIRE,
+		.sound_pitch = 0.90f,
 	},
 
 	/* 20 ULT_FIRE_3  meteor storm */
 	{
 		.element = ELEMENT_FIRE,
-		.motion = {.count = 10, .scatter = 420.0f, .stagger = 0.13f },
+		.motion = {.count = 9, .scatter = 420.0f, .stagger = 0.13f },
 		.life = 0.70f,
-		.spawn_delay = 999.0f,
+		.spawn_delay = 0.70f,
 		.hitbox = {.radius = 80.0f },
 		.impact = {.damage_mul = 0.0f },
 		.child = { SKILL_METEOR_IMPACT, SPAWN_ON_EXPIRE },
 		.color = { 1.00f, 0.30f, 0.02f },
 		.hitstop = 0.08f,
+		.fall_distance = 340.0f,
+		.fall_angle = -1.05f,
+		.fall_spread = 1.10f,           
+		.fall_radius = 13.0f,
+		.sound = SND_CAST_FIRE,
+		.sound_pitch = 0.80f,
 	},
 
 	/* 21 ULT_ICE_2  frost nova */
@@ -459,6 +559,8 @@ static constexpr SkillDef g_SkillDefs[SKILL_ID_COUNT] =
 		.color = { 0.65f, 0.92f, 1.00f },
 		.hitstop = 0.06f,
 		.draw_style = DRAW_RING,
+		.sound = SND_CAST_ICE,
+		.sound_pitch = 0.90f,
 	},
 
 	/* 22 ULT_ICE_3  glacial beam */
@@ -467,11 +569,13 @@ static constexpr SkillDef g_SkillDefs[SKILL_ID_COUNT] =
 		.life = 0.55f,
 		.spawn_delay = 0.25f,
 		.hitbox = {.length = 900.0f, .thickness = 30.0f },
-		.impact = {.damage_mul = 2.0f, .kb_speed = 200.0f, .kb_time = 0.15f, .stun_time = 0.30f },
+		.impact = {.damage_mul = 3.5f, .kb_speed = 200.0f, .kb_time = 0.15f, .stun_time = 0.30f },
 		.status = { { STATUS_SLOW, 2.0f, 0.22f } },
 		.color = { 0.45f, 0.85f, 1.00f },
 		.hitstop = 0.06f,
 		.draw_style = DRAW_BEAM,
+		.sound = SND_LAZER,
+		.sound_pitch = 1.10f,
 	},
 
 	/* 23 ULT_THUNDER_2 */
@@ -480,11 +584,13 @@ static constexpr SkillDef g_SkillDefs[SKILL_ID_COUNT] =
 		.motion = {.mode = MOTION_ORBIT_SEEK, .speed = 780.0f, .orbit_radius = 95.0f, .spin_speed = 3.2f, .count = 2, .seek_range = 240.0f },
 		.life = 5.00f,
 		.hitbox = {.radius = 22.0f },
-		.target = {.hit_interval = 0.30f, .chain_jumps = 2, .chain_range = 190.0f, .falloff = 0.5f, .min_damage_mul = 0.1f },
-		.impact = {.damage_mul = 0.3f, .kb_speed = 200.0f, .kb_time = 0.12f, .stun_time = 0.18f },
+		.target = {.hit_interval = 0.50f, .chain_jumps = 2, .chain_range = 190.0f, .falloff = 0.75f, .min_damage_mul = 0.1f },
+		.impact = {.damage_mul = 0.2f, .kb_speed = 200.0f, .kb_time = 0.12f, .stun_time = 0.18f },
 		.color = { 0.98f, 0.95f, 0.50f },
 		.trail = true,
 		.max_instances = 1,
+		.sound = SND_SUMMON,
+		.sound_pitch = 1.00f,
 	},
 
 	/* 24 ULT_THUNDER_3  tempest orb */
@@ -498,6 +604,8 @@ static constexpr SkillDef g_SkillDefs[SKILL_ID_COUNT] =
 		.color = { 0.88f, 0.92f, 0.30f },
 		.trail = true,
 		.max_instances = 3,
+		.sound = SND_CAST_THUNDER,
+		.sound_pitch = 1.10f,
 	},
 
 	// ==================================================== internal children
@@ -507,10 +615,12 @@ static constexpr SkillDef g_SkillDefs[SKILL_ID_COUNT] =
 		.life = 0.45f,
 		.hitbox = {.radius = 80.0f, .grow = true },
 		.impact = {.damage_mul = 2.0f, .kb_speed = 650.0f, .kb_time = 0.30f, .stun_time = 0.35f },
-		.status = { { STATUS_BURN, 2.0f, 2.0f } },
+		.status = { { STATUS_BURN, 2.0f, 1.0f } },
 		.color = { 1.00f, 0.20f, 0.00f },
 		.hitstop = 0.05f,
 		.draw_style = DRAW_RING,
+		.sound = SND_SMALL_EXPLOSION,
+		.sound_pitch = 1.00f,
 	},
 
 	/* 26  BIG METEOR_IMPACT */
@@ -519,10 +629,12 @@ static constexpr SkillDef g_SkillDefs[SKILL_ID_COUNT] =
 		.life = 0.45f,
 		.hitbox = {.radius = 150.0f, .grow = true },
 		.impact = {.damage_mul = 2.0f, .kb_speed = 650.0f, .kb_time = 0.30f, .stun_time = 0.35f },
-		.status = { { STATUS_BURN, 2.0f, 2.0f } },
+		.status = { { STATUS_BURN, 3.0f, 2.0f } },
 		.color = { 1.00f, 0.20f, 0.00f },
 		.hitstop = 0.07f,
 		.draw_style = DRAW_RING,
+		.sound = SND_EXPLOSION,
+		.sound_pitch = 0.80f,
 	},
 
 	/* 27 FROST_BURST */
@@ -543,7 +655,7 @@ static constexpr SkillDef g_SkillDefs[SKILL_ID_COUNT] =
 		.hitbox = {.radius = 80.0f },
 		.target = {.hit_interval = 0.80f },
 		.impact = {.damage_mul = 0.0f },
-		.status = { { STATUS_SLOW, 1.0f, 0.3f }, { STATUS_BURN, 1.0f, 0.5f } },
+		.status = { { STATUS_SLOW, 1.0f, 0.5f }, { STATUS_BURN, 2.0f, 0.5f } },
 		.color = { 0.80f, 0.80f, 0.90f },
 		.draw_style = DRAW_RING,
 	},
@@ -551,13 +663,14 @@ static constexpr SkillDef g_SkillDefs[SKILL_ID_COUNT] =
 	/* 29 MAGMA_GROUND */
 	{
 		.element = ELEMENT_FIRE,
-		.life = 3.00f,
-		.hitbox = {.radius = 80.0f },
-		.target = {.hit_interval = 0.70f },
-		.impact = {.damage_mul = 0.1f },
-		.status = { { STATUS_BURN, 1.0f, 0.5f }, { STATUS_SLOW, 0.5f, 0.7f } },
-		.color = { 0.90f, 0.25f, 0.05f },
+		.life = 5.00f,
+		.hitbox = {.radius = 100.0f },
+		.target = {.hit_interval = 0.75f },
+		.impact = {.damage_mul = 0.0f },
+		.status = { { STATUS_BURN, 3.0f, 0.25f }, { STATUS_SLOW, 3.0f, 0.7f } },
+		.color = { 0.65f, 0.05f, 0.00f },
 		.draw_style = DRAW_ORB,
+		.draw_under = true,
 		.max_instances = 2,
 	},
 
@@ -567,17 +680,19 @@ static constexpr SkillDef g_SkillDefs[SKILL_ID_COUNT] =
 		.life = 3.00f,
 		.hitbox = {.radius = 150.0f },
 		.target = {.hit_interval = 0.30f },
-		.impact = {.damage_mul = 0.4f, .pull_speed = 320.0f },
-		.status = { { STATUS_BURN, 1.0f, 1.0f } },
+		.impact = {.damage_mul = 0.0f, .pull_speed = 400.0f },
+		.status = { { STATUS_BURN, 0.1f, 0.1f } },
 		.color = { 1.00f, 0.45f, 0.10f },
 		.draw_style = DRAW_RING,
 		.max_instances = 2,
+		.sound = SND_WIRLPOOL,
+		.sound_pitch = 0.80f,
 	},
 };
 
 static constexpr int SKILL_INSTANCE_MAX = 96;
 static constexpr int SKILL_PIERCE_MAX = 24;   
-static constexpr int SKILL_TRAIL_MAX = 26; 
+static constexpr int SKILL_TRAIL_MAX = 64; 
 
 struct SkillInstance
 {
@@ -600,9 +715,16 @@ struct SkillInstance
 	int      hit_count;
 
 	Vector2  trail[SKILL_TRAIL_MAX];
+	float    trail_age[SKILL_TRAIL_MAX];
 	int      trail_count;
+	float    trail_step;      
+	float    return_timer;    
+	float    return_radius;
+	float    dive_timer;
+	Vector2  fall_from;
 
 	bool     active;
+	unsigned int element_mask;
 };
 
 static SkillInstance g_Instances[SKILL_INSTANCE_MAX]{};
@@ -623,6 +745,8 @@ static ArcVisual g_Arcs[ARC_MAX]{};
 
 static void SpawnArc(const Vector2& from, const Vector2& to, const XMFLOAT3& color)
 {
+	GameAudio_Play(SND_ZAP);
+
 	for (ArcVisual& a : g_Arcs)
 	{
 		if (a.active) { continue; }
@@ -633,7 +757,8 @@ static void SpawnArc(const Vector2& from, const Vector2& to, const XMFLOAT3& col
 
 static Vector2 CursorWorld()
 {
-	return {
+	return 
+	{
 		Camera_ScreenToWorldX(static_cast<float>(InputMouse_GetX())),
 		Camera_ScreenToWorldY(static_cast<float>(InputMouse_GetY()))
 	};
@@ -666,21 +791,92 @@ static void RememberHit(SkillInstance& s, int enemy_id)
 	}
 }
 
+static constexpr float TRAIL_LIFE = 0.18f;
+static constexpr float TRAIL_LIFE_ORBIT = 0.40f;
+static constexpr float TRAIL_LIFE_BOUNCE = 0.30f;
+static constexpr float TRAIL_SECONDS = TRAIL_LIFE;
+static constexpr float TRAIL_SECONDS_ORBIT = TRAIL_LIFE_ORBIT;
+static constexpr float TRAIL_SECONDS_BOUNCE = TRAIL_LIFE_BOUNCE;
+
+static float TrailLifeFor(const SkillDef& def)
+{
+	switch(def.motion.mode)
+	{
+	case MOTION_ORBIT:  return TRAIL_LIFE_ORBIT;
+	case MOTION_BOUNCE: return TRAIL_LIFE_BOUNCE;
+	default:			return TRAIL_LIFE;
+	}
+}
+
+static void AgeTrail(SkillInstance& s, const SkillDef& def, float delta_time)
+{
+	const float life = TrailLifeFor(def);
+
+	int keep = 0;
+	for (int i = 0; i < s.trail_count; i++)
+	{
+		s.trail_age[i] += delta_time;
+		if (s.trail_age[i] < life)
+		{
+			s.trail[keep] = s.trail[i];
+			s.trail_age[keep] = s.trail_age[i];
+			keep++;
+		}
+	}
+	s.trail_count = keep;
+}
+
+static float TrailStepFor(const SkillDef& def)
+{
+	float speed = def.motion.speed;
+	float seconds = TRAIL_SECONDS;
+
+	if (def.motion.mode == MOTION_ORBIT)
+	{
+		speed = def.motion.orbit_radius * def.motion.spin_speed;
+		seconds = TRAIL_SECONDS_ORBIT;
+	}
+	else if (def.motion.mode == MOTION_BOUNCE)
+	{
+		seconds = TRAIL_SECONDS_BOUNCE;
+	}
+	if (speed <= 1.0f) { speed = 200.0f; }
+
+	return std::max(1.0f, speed * seconds / (SKILL_TRAIL_MAX - 1));
+}
+
+static bool TrailIsLocal(const SkillDef& def)
+{
+	return def.motion.mode == MOTION_ORBIT;
+}
+
 static void RecordTrail(SkillInstance& s, const SkillDef& def)
 {
 	if (!def.trail) { return; }
 
+	const Vector2 sample = TrailIsLocal(def) ? (s.pos - PlayerPos()) : s.pos;
+
+	if (s.trail_count > 0)
+	{
+		const Vector2 last = s.trail[s.trail_count - 1];
+		if ((sample - last).LengthSq() < s.trail_step * s.trail_step) { return; }
+	}
+
 	if (s.trail_count < SKILL_TRAIL_MAX)
 	{
-		s.trail[s.trail_count++] = s.pos;
+		s.trail[s.trail_count] = sample;
+		s.trail_age[s.trail_count] = 0.0f;
+		s.trail_count++;
 		return;
 	}
 
 	for (int i = 0; i < SKILL_TRAIL_MAX - 1; i++)
 	{
 		s.trail[i] = s.trail[i + 1];
+		s.trail_age[i] = s.trail_age[i + 1];
 	}
-	s.trail[SKILL_TRAIL_MAX - 1] = s.pos;
+	s.trail[SKILL_TRAIL_MAX - 1] = sample;
+	s.trail_age[SKILL_TRAIL_MAX - 1] = 0.0f;
 }
 
 static SkillDef ModifiedDef(SkillId id)
@@ -690,12 +886,32 @@ static SkillDef ModifiedDef(SkillId id)
 
 	def.life *= m.life_mul;
 	def.motion.count += m.bonus_count;
-	def.impact.damage_mul *= m.damage_mul;    
+	def.impact.damage_mul *= m.damage_mul * GameItem_GetDamageMul();    
 
 	if (def.target.max_pierce > 0)
 	{
 		def.target.max_pierce += m.bonus_pierce;
 	}
+
+	switch (GameProgress_GetUltimateUpgrade())
+	{
+	case ULT_UPGRADE_ICE:
+		for (StatusApply& fx : def.status)
+		{
+			if (fx.type == STATUS_NONE) { continue; }
+			fx.time *= 1.5f;
+
+			fx.mag = (fx.type == STATUS_SLOW) ? (fx.mag * 0.5f) : (fx.mag * 2.0f);
+		}
+		break;
+	case ULT_UPGRADE_THUNDER:
+		def.motion.count += 1;
+		def.max_instances += (def.max_instances > 0) ? 1 : 0;
+		break;
+	default:
+		break;  
+	}
+
 	if (def.target.chain_jumps > 0 && def.element == ELEMENT_THUNDER)
 	{
 		def.target.chain_jumps += m.bonus_chains;
@@ -754,11 +970,17 @@ static bool InHitbox(const SkillInstance& s, const SkillDef& def,
 	return true;
 }
 
-static bool DeliverHit(const SkillInstance& s, const SkillDef& def, int enemy_index, int damage, const Vector2& dir)
+static bool DeliverHit(const SkillInstance& s, const SkillDef& def, int enemy_index, float damage, const Vector2& dir)
 {
+	if (GameEnemy_HasShield(enemy_index) && (s.element_mask & ElementBit(GameEnemy_GetShieldElement(enemy_index))) == 0)
+	{
+		return false;
+	}
+
 	HitInfo hit;
 	hit.damage = damage;
 	hit.hitstun_time = def.impact.stun_time;
+	hit.element_mask = s.element_mask;
 
 	if (def.impact.pull_speed > 0.0f)
 	{
@@ -773,6 +995,8 @@ static bool DeliverHit(const SkillInstance& s, const SkillDef& def, int enemy_in
 		hit.direction = dir;
 	}
 
+	GameDamageNumber_Spawn(GameEnemy_GetPos(enemy_index), damage, GameEnemy_GetId(enemy_index), def.color);
+
 	const bool killed = GameEnemy_ApplyHit(enemy_index, hit);
 
 	if (!killed)
@@ -783,12 +1007,7 @@ static bool DeliverHit(const SkillInstance& s, const SkillDef& def, int enemy_in
 			GameEnemy_ApplyStatus(enemy_index, fx.type, fx.time, fx.mag);
 		}
 	}
-	else
-	{
-		const Vector2 p = GameEnemy_GetPos(enemy_index);
-		GameImpact_Trigger(ExplosionType_Small, p.x, p.y);
-		// LATER: XP gem spawn
-	}
+
 	return killed;
 }
 
@@ -832,12 +1051,14 @@ static void InstanceCap(SkillId id, int max_instances, int per_cast)
 	}
 }
 
-void GameSkill_Cast(SkillId id, const Vector2& origin, const Vector2& aim, int power)
+void GameSkill_Cast(SkillId id, const Vector2& origin, const Vector2& aim, int power, unsigned int element_mask)
 {
 	if (id == SKILL_NONE) { return; }
 
 	const SkillDef def = ModifiedDef(id);         
 	const int count = std::max(1, def.motion.count);
+
+	GameAudio_PlayPitched(def.sound, def.sound_pitch);
 
 	InstanceCap(id, def.max_instances, count);
 
@@ -882,8 +1103,35 @@ void GameSkill_Cast(SkillId id, const Vector2& origin, const Vector2& aim, int p
 			s.pos += Vector2_FromAngle(TWO_PI * RandUnit()) * (def.motion.scatter * RandUnit());
 		}
 
-		s.life = def.life;
-		s.max_life = def.life;
+		if (def.fall_distance > 0.0f)
+		{
+			const float angle = def.fall_angle + (RandUnit() * 2.0f - 1.0f) * def.fall_spread;
+			const Vector2 dir = Vector2_FromAngle(angle);
+
+			// Distance needed to clear the view along THIS heading. A fixed
+			// distance pops in whenever the impact point is near screen
+			// centre; deriving it means every meteor enters from offscreen
+			// no matter where it lands or which way it comes from.
+			const float to_edge_x = (dir.x > 0.0f)
+				? (Camera_GetX() + SCREEN_WIDTH - s.pos.x)
+				: (s.pos.x - Camera_GetX());
+			const float to_edge_y = (dir.y > 0.0f)
+				? (Camera_GetY() + SCREEN_HEIGHT - s.pos.y)
+				: (s.pos.y - Camera_GetY());
+
+			const float tx = (fabsf(dir.x) > 0.01f) ? to_edge_x / fabsf(dir.x) : 99999.0f;
+			const float ty = (fabsf(dir.y) > 0.01f) ? to_edge_y / fabsf(dir.y) : 99999.0f;
+
+			// fall_distance is now a MARGIN past the edge, not the whole span.
+			s.fall_from = s.pos + dir * (std::min(tx, ty) + def.fall_distance);
+		}
+		else
+		{
+			s.fall_from = s.pos;
+		}
+
+		s.life = def.life + def.motion.stagger * spawned;
+		s.max_life = s.life;
 		s.delay_left = def.spawn_delay + def.motion.stagger * spawned;
 		s.visual_radius = def.hitbox.grow ? 0.0f : def.hitbox.radius;
 		s.hit_timer = 0.0f;
@@ -892,7 +1140,13 @@ void GameSkill_Cast(SkillId id, const Vector2& origin, const Vector2& aim, int p
 		s.seek_cooldown = 0.0f;
 		s.hit_count = 0;
 		s.trail_count = 0;
+		for (float& age : s.trail_age) { age = 0.0f; }
+		s.trail_step = TrailStepFor(def);
+		s.return_timer = 0.0f;
+		s.return_radius = 0.0f;
+		s.dive_timer = 0.0f;
 		s.active = true;
+		s.element_mask = element_mask;
 
 		if (++spawned >= count) { break; }
 	}
@@ -943,20 +1197,134 @@ void GameSkill_CastUltimate(ElementType e, const Vector2& origin, const Vector2&
 
 	if (id == SKILL_NONE) { return; }
 
+	GameAudio_Play(UltimateVoice(e));
+
 	GameUI_Flash(g_SkillDefs[id].color, 0.28f);
 
-	GameSkill_Cast(id, origin, aim, GameProgress_GetElementLevel(e) * 3);
+	const int power = GameProgress_GetElementLevel(e);
+
+	if (GameProgress_GetUltimateUpgrade() == ULT_UPGRADE_FIRE)
+	{
+		const int split = std::max(1, static_cast<int>(power * 0.75f));
+		if (g_SkillDefs[id].max_instances < 1)
+		{
+			GameSkill_Cast(id, origin, aim, split, ElementBit(e));
+		}
+		else
+		{
+			GameSkill_Cast(id, origin, aim, power, ElementBit(e));
+		}
+		
+		g_PendingId = id;
+		g_PendingDelay = 0.9f;
+		g_PendingOrigin = origin;
+		g_PendingAim = aim;
+		g_PendingPower = split;
+		g_PendingMask = ElementBit(e);
+		return;
+	}
+
+	GameSkill_Cast(id, origin, aim, power, ElementBit(e));
 }
 
 // ============================================================================
 // Damage
 // ============================================================================
+static bool TryHitBoss(SkillInstance& s, const SkillDef& def)
+{
+	bool hit_any = false;
+
+	for (int i = 0; i < BOSS_MAX; i++)
+	{
+		if (!GameBoss_IsActive(i)) { continue; }
+
+		const int boss_hit_id = -100 - i;       
+		if (AlreadyHit(s, boss_hit_id)) { continue; }
+
+		const Vector2 boss_pos = GameBoss_GetPos(i);
+		if (!InHitbox(s, def, boss_pos, GameBoss_GetRadius(i))) { continue; }
+
+		if (GameBoss_HasShield(i) && (s.element_mask & ElementBit(GameBoss_GetShieldElement(i))) == 0)
+		{
+			continue;
+		}
+
+		RememberHit(s, boss_hit_id);
+
+		if (!hit_any) { GameAudio_PlayPitched(def.hit_sound, def.hit_pitch); }
+
+		const Vector2 dir = Vector2_Normalize(boss_pos - s.pos);
+
+		HitInfo hit;
+		hit.damage = std::max(0.5f, s.power * def.impact.damage_mul);
+		hit.element_mask = s.element_mask;
+		hit.hitstun_time = 0.0f;      
+		hit.direction = dir;
+
+		GameBoss_ApplyHit(i, hit);
+
+		GameDamageNumber_Spawn(boss_pos, hit.damage, -100 - i, def.color);
+
+		for (const StatusApply& fx : def.status)
+		{
+			if (fx.type == STATUS_NONE) { continue; }
+			GameBoss_ApplyStatus(i, fx.type, fx.time, fx.mag);
+		}
+
+		if (def.child.id != SKILL_NONE && (def.child.trigger == SPAWN_ON_HIT || def.child.trigger == SPAWN_ON_TICK))
+		{
+			GameSkill_Cast(def.child.id, boss_pos, dir, s.power, s.element_mask);
+		}
+
+		if (def.target.chain_jumps > 0) { SpawnArc(s.pos, boss_pos, def.color); }
+
+		hit_any = true;
+	}
+
+	return hit_any;
+}
+
+static constexpr int SKILL_QUERY_MAX = 128;
+static constexpr float MAX_ENEMY_RADIUS = 34.0f;
+
+static float QueryReach(const SkillDef& def)
+{
+	if (def.hitbox.length > 0.0f) 
+	{ 
+		return def.hitbox.length + def.hitbox.thickness + MAX_ENEMY_RADIUS;
+	}
+
+	return def.hitbox.radius + MAX_ENEMY_RADIUS;
+}
+
 static void DamagePass(SkillInstance& s, const SkillDef& def)
 {
+	const bool hit_boss = TryHitBoss(s, def);
+	if (hit_boss && def.motion.mode == MOTION_LINEAR && def.target.hit_interval <= 0.0f && s.hit_count > def.target.max_pierce)
+	{
+		s.active = false;
+		return;
+	}
+
 	int targets_hit = 0;
 
-	for (int i = 0; i < GameEnemy_GetActiveCount(); i++)
+	int candidates[SKILL_QUERY_MAX]{};
+	int candidate_count = 0;
+	int hop[SKILL_QUERY_MAX]{};
+
+	if (def.hitbox.screen_wide)
 	{
+		candidate_count = std::min(GameEnemy_GetActiveCount(), SKILL_QUERY_MAX);
+		for (int k = 0; k < candidate_count; k++) { candidates[k] = k; }
+	}
+	else
+	{
+		candidate_count = GameEnemy_QueryRadius(s.pos, QueryReach(def), candidates, SKILL_QUERY_MAX);
+	}
+
+	for (int k = 0; k < candidate_count; k++)
+	{
+		const int i = candidates[k];
 		const int enemy_id = GameEnemy_GetId(i);
 		if (AlreadyHit(s, enemy_id)) { continue; }
 
@@ -964,12 +1332,16 @@ static void DamagePass(SkillInstance& s, const SkillDef& def)
 		const Vector2 enemy_pos = { cc.position.x, cc.position.y };
 		if (!InHitbox(s, def, enemy_pos, cc.radius)) { continue; }
 
+		if (targets_hit == 0)
+		{
+			GameAudio_PlayPitched(def.hit_sound, def.hit_pitch);
+		}
+
 		float mul = 1.0f;
-		for (int k = 0; k < targets_hit; k++) { mul *= def.target.falloff; }
+		for (int f = 0; f < targets_hit; f++) { mul *= def.target.falloff; }
 		mul = std::max(mul, def.target.min_damage_mul);
 
-		const int damage = std::max(1,
-			static_cast<int>(s.power * def.impact.damage_mul * mul));
+		const float damage = std::max(0.5f, s.power * def.impact.damage_mul * mul);
 		const Vector2 offset = enemy_pos - s.pos;
 		const Vector2 dir = (offset.LengthSq() < 0.01f) ? s.facing : Vector2_Normalize(offset);
 
@@ -980,37 +1352,42 @@ static void DamagePass(SkillInstance& s, const SkillDef& def)
 		// child spawned at the target
 		if (def.child.id != SKILL_NONE && (def.child.trigger == SPAWN_ON_HIT || def.child.trigger == SPAWN_ON_TICK))
 		{
-			GameSkill_Cast(def.child.id, enemy_pos, dir, s.power);
+			GameSkill_Cast(def.child.id, enemy_pos, dir, s.power, s.element_mask);
+
+			if (GameProgress_GetUltimateUpgrade() == ULT_UPGRADE_THUNDER)
+			{
+				GameSkill_Cast(def.child.id, enemy_pos, dir, s.power, s.element_mask);
+			}
 		}
 
 		if (def.target.chain_jumps > 0) { SpawnArc(s.pos, enemy_pos, def.color); }
 
-		// chain: each hop searches from the LAST enemy hit, walking outward
+		// chain: each hop searches from the last enemy hit, walking outward
 		Vector2 arc_from = enemy_pos;
 		for (int jump = 0; jump < def.target.chain_jumps; jump++)
 		{
-			int   best = -1;
+			int best = -1;
 			float best_sq = def.target.chain_range * def.target.chain_range;
 
-			for (int j = 0; j < GameEnemy_GetActiveCount(); j++)
-			{
-				if (AlreadyHit(s, GameEnemy_GetId(j))) { continue; }
+			const int hop_count = GameEnemy_QueryRadius(arc_from, def.target.chain_range + MAX_ENEMY_RADIUS, hop, SKILL_QUERY_MAX);
 
+			for (int h = 0; h < hop_count; h++)
+			{
+				const int j = hop[h];
+				if (AlreadyHit(s, GameEnemy_GetId(j))) { continue; }
 				const float d_sq = (GameEnemy_GetPos(j) - arc_from).LengthSq();
 				if (d_sq < best_sq) { best_sq = d_sq; best = j; }
 			}
 			if (best < 0) { break; }   // nothing left in range: chain ends
 
 			float arc_mul = 1.0f;
-			for (int k = 0; k < targets_hit; k++) { arc_mul *= def.target.falloff; }
+			for (int f = 0; f < targets_hit; f++) { arc_mul *= def.target.falloff; }
 			arc_mul = std::max(arc_mul, def.target.min_damage_mul);
 
 			const Vector2 arc_pos = GameEnemy_GetPos(best);
 			const Vector2 arc_dir = Vector2_Normalize(arc_pos - arc_from);
 
-			DeliverHit(s, def, best,
-				std::max(1, static_cast<int>(s.power * def.impact.damage_mul * arc_mul)),
-				arc_dir);
+			DeliverHit(s, def, best, std::max(0.5f, s.power * def.impact.damage_mul * arc_mul), arc_dir);
 			SpawnArc(arc_from, arc_pos, def.color);
 			RememberHit(s, GameEnemy_GetId(best));
 
@@ -1030,6 +1407,19 @@ static void DamagePass(SkillInstance& s, const SkillDef& def)
 
 void GameSkill_Update(float delta_time)
 {
+	if (g_PendingId != SKILL_NONE)
+	{
+		g_PendingDelay -= delta_time;
+		if (g_PendingDelay <= 0.0f)
+		{
+			const SkillId id = g_PendingId;
+			g_PendingId = SKILL_NONE;  
+
+			GameUI_Flash(g_SkillDefs[id].color, 0.28f);
+			GameSkill_Cast(id, g_PendingOrigin, g_PendingAim, g_PendingPower, g_PendingMask);
+		}
+	}
+
 	for (ArcVisual& a : g_Arcs)
 	{
 		if (!a.active) { continue; }
@@ -1049,10 +1439,12 @@ void GameSkill_Update(float delta_time)
 			s.active = false;
 			if (def.child.id != SKILL_NONE && def.child.trigger == SPAWN_ON_EXPIRE)
 			{
-				GameSkill_Cast(def.child.id, s.pos, s.facing, s.power);
+				GameSkill_Cast(def.child.id, s.pos, s.facing, s.power, s.element_mask);
 			}
 			continue;
 		}
+
+		if (def.trail) { AgeTrail(s, def, delta_time); }
 
 		// --- position for this frame ---
 		switch (def.motion.mode)
@@ -1085,16 +1477,41 @@ void GameSkill_Update(float delta_time)
 
 			if (s.target_id == 0)
 			{
+				// no target: orbit around the player
 				s.orbit_angle += def.motion.spin_speed * delta_time;
-				s.pos = PlayerPos() + Vector2_FromAngle(s.orbit_angle) * def.motion.orbit_radius;
+
+				float radius = def.motion.orbit_radius;
+				if (s.return_timer > 0.0f)
+				{
+					s.return_timer -= delta_time;
+					const float t = std::clamp(1.0f - s.return_timer / ORBIT_RETURN_TIME, 0.0f, 1.0f);
+					const float e = 1.0f - (1.0f - t) * (1.0f - t);   // ease out
+					radius = s.return_radius + (def.motion.orbit_radius - s.return_radius) * e;
+				}
+
+				s.pos = PlayerPos() + Vector2_FromAngle(s.orbit_angle) * radius;
+
 
 				if (s.seek_cooldown <= 0.0f && s.hit_timer <= 0.0f)
 				{
 					const float seek_sq = def.motion.seek_range * def.motion.seek_range;
-					for (int i = 0; i < GameEnemy_GetActiveCount(); i++)
+
+					for (int i = 0; i < BOSS_MAX; i++)
 					{
-						if ((GameEnemy_GetPos(i) - s.pos).LengthSq() < seek_sq)
+						if (!GameBoss_IsActive(i)) { continue; }
+						if ((GameBoss_GetPos(i) - s.pos).LengthSq() >= seek_sq) { continue; }
+						if (GameBoss_HasShield(i) && (s.element_mask & ElementBit(GameBoss_GetShieldElement(i))) == 0) { continue; }
+						
+						s.target_id = BOSS_TARGET_ID - i;
+						break;
+					}
+
+					if (s.target_id == 0)       
+					{
+						for (int i = 0; i < GameEnemy_GetActiveCount(); i++)
 						{
+							if ((GameEnemy_GetPos(i) - s.pos).LengthSq() >= seek_sq) { continue; }
+
 							s.target_id = GameEnemy_GetId(i);
 							break;
 						}
@@ -1103,14 +1520,41 @@ void GameSkill_Update(float delta_time)
 			}
 			else
 			{
-				const int idx = GameEnemy_FindById(s.target_id);
-				if (idx < 0)
+				// has a target: move toward it
+				s.dive_timer += delta_time;
+
+				if (s.dive_timer >= DIVE_TIMEOUT) 
 				{
-					s.target_id = 0;     
+					const Vector2 from_player = s.pos - PlayerPos();
+					s.orbit_angle = Vector2_ToAngle(from_player);
+					s.return_radius = from_player.Length();
+					s.return_timer = ORBIT_RETURN_TIME;
+					s.target_id = 0;
+					s.seek_cooldown = 0.3f;
+					s.dive_timer = 0.0f;
+					RecordTrail(s, def);
 					break;
 				}
 
-				const Vector2 to_target = GameEnemy_GetPos(idx) - s.pos;
+				Vector2 target_pos;
+				if (s.target_id < 0)       
+				{
+					const int boss_idx = BOSS_TARGET_ID - s.target_id;   
+					if (boss_idx < 0 || boss_idx >= BOSS_MAX || !GameBoss_IsActive(boss_idx))
+					{
+						s.target_id = 0;
+						break;
+					}
+					target_pos = GameBoss_GetPos(boss_idx);
+				}
+				else
+				{
+					const int idx = GameEnemy_FindById(s.target_id);
+					if (idx < 0) { s.target_id = 0; break; }
+					target_pos = GameEnemy_GetPos(idx);
+				}
+
+				const Vector2 to_target = target_pos - s.pos;
 				if (to_target.LengthSq() > 1.0f)
 				{
 					s.facing = Vector2_Normalize(to_target);
@@ -1178,8 +1622,14 @@ void GameSkill_Update(float delta_time)
 
 				if (s.hit_count > 0)   
 				{
+					const Vector2 from_player = s.pos - PlayerPos();
+					s.orbit_angle = Vector2_ToAngle(from_player);
+					s.return_radius = from_player.Length();    
+					s.return_timer = ORBIT_RETURN_TIME;
 					s.target_id = 0;
+					s.seek_cooldown = 0.3f;
 					s.hit_timer = def.target.hit_interval;
+					s.dive_timer = 0.0f;
 				}
 			}
 			continue;
@@ -1206,23 +1656,16 @@ void GameSkill_Update(float delta_time)
 // ============================================================================
 // Draw
 // ============================================================================
-void GameSkill_Draw()
+static void DrawInstances(bool under_layer)
 {
-	for (const ArcVisual& a : g_Arcs)
-	{
-		if (!a.active) { continue; }
-
-		const float fade = a.life / ARC_LIFE;
-		DrawPrim_Beam(a.from, a.to, 2.0f + 3.0f * fade, a.color, fade);
-	}
-
 	for (const SkillInstance& s : g_Instances)
 	{
 		if (!s.active) { continue; }
+		if (s.def.draw_under != under_layer) { continue; }
 
 		const SkillDef& def = s.def;
 
-		// --- screen-wide ring out from the player ---
+		// --- screenwide ring out from the player ---
 		if (def.hitbox.screen_wide)
 		{
 			const float r = 400.0f * (1.0f - (s.life / s.max_life));
@@ -1231,16 +1674,32 @@ void GameSkill_Draw()
 			continue;
 		}
 
-		// --- telegraph: where it WILL land, filled disc
+		// --- telegraph: where it will land, filled disc ---
 		if (s.delay_left > 0.0f && def.spawn_delay > 0.0f)
 		{
 			if (def.hitbox.length > 0.0f) { continue; }
 
-			const float t = std::min(s.delay_left / def.spawn_delay, 1.0f);
+			const float life_t = 1.0f - (s.life / s.max_life);
 			const float r = (def.hitbox.radius > 0.0f) ? def.hitbox.radius : def.hitbox.length * 0.5f;
 
 			DrawPrim_Ring(s.pos, r, 3.0f, def.color, 0.9f);
-			DrawPrim_Circle(s.pos, r * (1.0f - t), def.color, 0.30f);
+			DrawPrim_Circle(s.pos, r * life_t, def.color, 0.30f);
+
+			if (def.fall_distance > 0.0f)
+			{
+				const float fall_t = life_t * life_t;      // accelerating
+				const Vector2 at = Vector2_Lerp(s.fall_from, s.pos, fall_t);
+				const Vector2 dir = Vector2_Normalize(s.pos - s.fall_from);
+				const float   rad = def.fall_radius;
+
+				DrawPrim_Beam(at - dir * (rad * 6.8f), at, rad * 0.75f, def.color, 0.55f);
+				DrawPrim_Beam(at - dir * (rad * 3.2f), at, rad * 1.05f, def.color, 0.85f);
+
+				DrawPrim_Circle(at, rad * 1.25f, { 1.0f, 0.62f, 0.15f }, 0.9f);
+				DrawPrim_Circle(at, rad, { 0.22f, 0.13f, 0.11f }, 1.0f);
+				DrawPrim_Circle(at - dir * (rad * 0.35f), rad * 0.45f,
+					{ 1.0f, 0.85f, 0.45f }, 0.8f);
+			}
 			continue;
 		}
 
@@ -1261,7 +1720,7 @@ void GameSkill_Draw()
 					const float r = def.hitbox.thickness * (0.55f + 0.45f * t);
 
 					DrawPrim_Circle(p, r, def.color, 0.95f);
-					DrawPrim_Circle(p, r * 0.42f, { 0.62f, 0.82f, 1.0f }, 0.9f);   // icy core
+					DrawPrim_Circle(p, r * 0.42f, { 0.62f, 0.82f, 1.0f }, 0.9f);   // blue core
 					DrawPrim_Ring(p, r * 1.25f, 2.0f, def.color, 0.4f);
 				}
 			}
@@ -1303,7 +1762,20 @@ void GameSkill_Draw()
 		// --- trail ---
 		if (def.trail && s.trail_count >= 2)
 		{
-			DrawPrim_Trail(s.trail, s.trail_count,
+			const Vector2* pts = s.trail;
+
+			Vector2 world[SKILL_TRAIL_MAX];
+			if (TrailIsLocal(def))
+			{
+				const Vector2 p = PlayerPos();
+				for (int i = 0; i < s.trail_count; i++)
+				{
+					world[i] = s.trail[i] + p;
+				}
+				pts = world;
+			}
+
+			DrawPrim_Trail(pts, s.trail_count,
 				def.hitbox.radius * 0.8f, def.color, 0.8f, 0.0f);
 		}
 
@@ -1331,4 +1803,22 @@ void GameSkill_Draw()
 			{ 0.35f, 0.35f, 0.35f });
 #endif
 	}
+}
+
+void GameSkill_DrawUnder()
+{
+	DrawInstances(true);
+}
+
+void GameSkill_Draw()
+{
+	for (const ArcVisual& a : g_Arcs)
+	{
+		if (!a.active) { continue; }
+
+		const float fade = a.life / ARC_LIFE;
+		DrawPrim_Beam(a.from, a.to, 2.0f + 3.0f * fade, a.color, fade);
+	}
+
+	DrawInstances(false);
 }

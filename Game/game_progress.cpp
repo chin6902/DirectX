@@ -1,8 +1,8 @@
-/*============================================================================
+﻿/*============================================================================
 Contents   :  [game_progress.cpp]
 
 Author     : Chin Qing You
-LastUpdate : 2026/08/15
+LastUpdate : 2026/08/24
 -----------------------------------------------------------------------------
 
 ============================================================================*/
@@ -16,53 +16,53 @@ struct LevelReward
 	bool  grants_slot = false;
 	bool  offers_element = false;
 	bool  offers_stat = false;
-	float charge_time_mul = 1.0f;   
+	bool  offers_ultimate = false;
+	bool  offers_item = false;              
+	unsigned int stat_mask = 0;
+	float charge_time_mul = 1.0f;
 };
+
+static constexpr unsigned int StatBit(StatType s) { return 1u << static_cast<int>(s); }
+static constexpr unsigned int EARLY_STATS = StatBit(STAT_MOVE_SPEED) | StatBit(STAT_XP_GAIN) | StatBit(STAT_HP_REGEN);
 
 static constexpr LevelReward g_LevelPlan[PLAYER_LEVEL_MAX + 1] =
 {
-	{},                                                                       // 0 
-	{},                                                                       // 1
-	{.grants_slot = true, .offers_element = true, .charge_time_mul = 0.85f }, // 2
-	{.offers_stat = true },                                                   // 3
-	{.offers_stat = true },                                                   // 4
-	{.grants_slot = true, .offers_element = true, .charge_time_mul = 0.85f }, // 5
-	{.offers_stat = true },                                                   // 6
-	{.offers_stat = true },                                                   // 7
-	{.offers_stat = true },                                                   // 8
-	{.offers_stat = true },                                                   // 9
-	{.offers_stat = true },                                                   // 10
+	{},                                                                        // 0 
+	{},                                                                        // 1  start
+	{.grants_slot = true, .offers_element = true, .charge_time_mul = 0.85f },  // 2  element
+	{.offers_stat = true, .stat_mask = EARLY_STATS },                          // 3  stat
+	{.offers_item = true },                                                    // 4  ITEM CHOICE (was stat)
+	{.grants_slot = true, .offers_element = true, .charge_time_mul = 0.80f },  // 5  element
+	{.offers_ultimate = true },                                                // 6  boost
 };
 
-// XP needed to reach each level
 static constexpr int g_XPToLevel[PLAYER_LEVEL_MAX + 1] =
 {
-	0, 0, 20, 50, 90, 140, 210, 300, 410, 550, 720,
+	0, 0, 10, 40, 80, 160, 420,
 };
 
 static constexpr ElementMods g_ElementBonus[ELEMENT_TYPE_COUNT][ELEMENT_LEVEL_MAX + 1] =
 {
 	// ---------------- FIRE ----------------
 	{
-		{},                                                             // 0 
-		{},                                                             // 1 
-		{.damage_mul = 1.1f, .status_mag = 1.5f },                      // 2
-		{.damage_mul = 1.3f, .status_time = 1.4f, .status_mag = 2.0f }, // 3
+		{},
+		{},
+		{.damage_mul = 1.35f, .status_mag = 1.1f },                      // 2
+		{.damage_mul = 1.75f, .status_time = 1.2f, .status_mag = 1.5f }, // 3
 	},
 	// ---------------- ICE -----------------
 	{
-		{},																// 0
-		{},																// 1
-		{.status_time = 1.5f, .status_mag = 0.85f, .bonus_pierce = 3 }, // 2  
-		{.damage_mul = 1.25f, .status_time = 2.0f, .status_mag = 0.7f,  // 3
-		  .bonus_pierce = 6 },                                       
+		{},
+		{},
+		{.status_time = 1.5f, .status_mag = 0.85f, .bonus_pierce = 3 },                     // 2 
+		{.damage_mul = 1.25f, .status_time = 2.0f, .status_mag = 0.6f, .bonus_pierce = 6 }, // 3
 	},
 	// -------------- THUNDER ---------------
 	{
-		{},																 // 0
-		{},																 // 1
+		{},
+		{},
 		{.bonus_chains = 1, .life_mul = 1.3f },                          // 2
-		{.damage_mul = 1.2f, .bonus_chains = 2, .life_mul = 1.8f },      // 3
+		{.damage_mul = 1.2f, .bonus_chains = 2, .life_mul = 1.7f },      // 3
 	},
 };
 
@@ -77,13 +77,20 @@ struct StatInfo
 static constexpr StatInfo g_StatInfo[STAT_TYPE_COUNT] =
 {
 	//  base    step   cap  label
-	{  10.0f,   5.0f,   6,  "Max HP +5"          },  // 10 -> 40
-	{ 300.0f,  20.0f,   5,  "Move Speed +20"     },  // 300 -> 400
-	{  90.0f,  30.0f,   4,  "Pickup Range +30"   },  // 90 -> 210
-	{   1.0f,   0.1f,   4,  "I-Frames +0.1s"     },  // 1.0 -> 1.4 s
-	{   0.0f,   0.1f,   5,  "HP Regen +0.1/s"    },  // 0 -> 0.5/s
-	{   0.0f,   1.0f,   3,  "Damage Taken -1"    },  // 0 -> 3 flat
-	{   1.0f,  0.25f,   4,  "XP Gain +25%"       },  // 1.0 -> 2.0x
+	{  20.0f,  10.0f,   0,  "Max HP +10"         },  
+	{ 300.0f,  50.0f,   1,  "Move Speed +50"     },  // 300 -> 350
+	{ 150.0f,  50.0f,   0,  "Pickup Range +50"   },
+	{   1.0f,  0.25f,   0,  "I-Frames +0.25s"    },
+	{   0.1f,  0.10f,   1,  "HP Regen +0.1/s"    },  // 0.1 -> 0.2/s
+	{   0.0f,  1.00f,   0,  "Damage Taken -1"    },
+	{   1.0f,  0.50f,   1,  "XP Gain +50%"       },  // 1.0 -> 1.5x
+};
+
+static constexpr const char* g_UltimateLabel[ELEMENT_TYPE_COUNT] =
+{
+	"ultimate casts twice at 0.75x",
+	"statuses deal 2x for 1.5x longer",
+	"+1 projectile, instance, child",
 };
 
 static constexpr const char* g_ElementLabel[ELEMENT_TYPE_COUNT] =
@@ -93,11 +100,17 @@ static constexpr const char* g_ElementLabel[ELEMENT_TYPE_COUNT] =
 	"Thunder +1  summons / chains",
 };
 
+static constexpr const char* g_ItemLabel[ITEM_TYPE_COUNT] =
+{
+	"Fire Staff +30% dmg 15s",
+	"Vials +2 HP drop 10%",
+	"Storm Staff -20% charge 15s",
+};
+
 static int   g_Level = 1;
 static int   g_XP = 0;
 static int   g_SlotCount = 1;
 static float g_ChargeTimeMul = 1.0f;
-
 static int   g_ElementLevel[ELEMENT_TYPE_COUNT]{};
 static int   g_StatRanks[STAT_TYPE_COUNT]{};
 
@@ -105,14 +118,25 @@ static bool          g_LevelPending = false;
 static UpgradeOption g_Offers[UPGRADE_OFFER_MAX];
 static int           g_OfferCount = 0;
 
+static UltimateUpgrade g_UltUpgrade = ULT_UPGRADE_NONE;
+static ItemType        g_ChosenItem = ITEM_TYPE_COUNT;   
+
 static bool ElementAvailable(int e)
 {
 	return g_ElementLevel[e] < ELEMENT_LEVEL_MAX;
 }
 
-static bool StatAvailable(int s)
+static bool StatAvailable(int s, unsigned int mask)
 {
+	if (mask != 0 && (mask & StatBit(static_cast<StatType>(s))) == 0) { return false; }
 	return g_StatRanks[s] < g_StatInfo[s].max_rank;
+}
+
+static UpgradeOption MakeUltimateOption(int e)
+{
+	return { .kind = UPGRADE_ULTIMATE,
+			 .element = static_cast<ElementType>(e),
+			 .label = g_UltimateLabel[e] };
 }
 
 static UpgradeOption MakeElementOption(int e)
@@ -129,11 +153,20 @@ static UpgradeOption MakeStatOption(int s)
 			 .label = g_StatInfo[s].label };
 }
 
+static UpgradeOption MakeItemOption(int i)
+{
+	return { .kind = UPGRADE_ITEM,
+			 .item = static_cast<ItemType>(i),
+			 .label = g_ItemLabel[i] };
+}
+
 static void BuildOffers(const LevelReward& reward)
 {
 	g_OfferCount = 0;
 
-	UpgradeOption pool[static_cast<int>(ELEMENT_TYPE_COUNT) + static_cast<int>(STAT_TYPE_COUNT)];
+	static constexpr int POOL_MAX = static_cast<int>(ELEMENT_TYPE_COUNT) + static_cast<int>(STAT_TYPE_COUNT);
+
+	UpgradeOption pool[POOL_MAX];
 	int pool_count = 0;
 
 	if (reward.offers_element)
@@ -144,11 +177,29 @@ static void BuildOffers(const LevelReward& reward)
 		}
 	}
 
+	if (reward.offers_ultimate)
+	{
+		for (int e = 0; e < ELEMENT_TYPE_COUNT; e++)
+		{
+			g_Offers[g_OfferCount++] = MakeUltimateOption(e);
+		}
+		return;
+	}
+
+	if (reward.offers_item)
+	{
+		for (int i = 0; i < ITEM_TYPE_COUNT; i++)
+		{
+			g_Offers[g_OfferCount++] = MakeItemOption(i);
+		}
+		return;
+	}
+
 	if (reward.offers_stat)
 	{
 		for (int s = 0; s < STAT_TYPE_COUNT; s++)
 		{
-			if (StatAvailable(s)) { pool[pool_count++] = MakeStatOption(s); }
+			if (StatAvailable(s, reward.stat_mask)) { pool[pool_count++] = MakeStatOption(s); }
 		}
 	}
 
@@ -174,7 +225,6 @@ static void BuildOffers(const LevelReward& reward)
 		{
 			if (g_Offers[i].kind == UPGRADE_ELEMENT) { has_element = true; break; }
 		}
-
 		if (!has_element)
 		{
 			for (int e = 0; e < ELEMENT_TYPE_COUNT; e++)
@@ -205,14 +255,12 @@ void GameProgress_Initialize()
 	g_ChargeTimeMul = 1.0f;
 	g_LevelPending = false;
 	g_OfferCount = 0;
-
+	g_UltUpgrade = ULT_UPGRADE_NONE;   
+	g_ChosenItem = ITEM_TYPE_COUNT;    
 	for (int e = 0; e < ELEMENT_TYPE_COUNT; e++) { g_ElementLevel[e] = 1; }
 	for (int s = 0; s < STAT_TYPE_COUNT; s++) { g_StatRanks[s] = 0; }
 }
 
-// ============================================================================
-// XP / levelling
-// ============================================================================
 void GameProgress_AddXP(int amount)
 {
 	if (g_Level >= PLAYER_LEVEL_MAX || g_LevelPending) { return; }
@@ -222,6 +270,7 @@ void GameProgress_AddXP(int amount)
 	const int next = g_Level + 1;
 	if (g_XP < g_XPToLevel[next]) { return; }
 
+	// --- level up ---
 	g_Level = next;
 	const LevelReward& reward = g_LevelPlan[g_Level];
 
@@ -232,7 +281,7 @@ void GameProgress_AddXP(int amount)
 	g_ChargeTimeMul *= reward.charge_time_mul;
 
 	BuildOffers(reward);
-	g_LevelPending = true;    
+	g_LevelPending = true;
 }
 
 int GameProgress_GetXP() { return g_XP; }
@@ -266,10 +315,18 @@ void GameProgress_ChooseOffer(int index)
 
 	const UpgradeOption& opt = g_Offers[index];
 
-	if (opt.kind == UPGRADE_ELEMENT)
+	if (opt.kind == UPGRADE_ULTIMATE)
+	{
+		g_UltUpgrade = static_cast<UltimateUpgrade>(opt.element);
+	}
+	else if (opt.kind == UPGRADE_ELEMENT)
 	{
 		int& lv = g_ElementLevel[opt.element];
 		lv = std::min(lv + 1, ELEMENT_LEVEL_MAX);
+	}
+	else if (opt.kind == UPGRADE_ITEM)      
+	{
+		g_ChosenItem = opt.item;
 	}
 	else
 	{
@@ -311,6 +368,15 @@ int GameProgress_GetStatRank(StatType s)
 {
 	if (s < 0 || s >= STAT_TYPE_COUNT) { return 0; }
 	return g_StatRanks[s];
+}
+
+UltimateUpgrade GameProgress_GetUltimateUpgrade() { return g_UltUpgrade; }
+
+ItemType GameProgress_GetChosenItem() { return g_ChosenItem; }   
+
+float GameProgress_GetPickUpRange()
+{
+	return GameProgress_GetStat(STAT_PICKUP_RANGE);
 }
 
 int GameProgress_GetStatMaxRank(StatType s)

@@ -31,6 +31,20 @@ void DrawPrim_Finalize()
 	Texture_Release(g_white_texture_id);
 }
 
+void DrawPrim_Line(const Vector2& from, const Vector2& to, float thickness,
+	const XMFLOAT3& color, float alpha, float overlap)
+{
+	const Vector2 delta = to - from;
+	const float   len = delta.Length();
+	if (len < 0.5f) { return; }
+	if (len > 3000.0f) { return; }
+
+	DrawPrim_Rect(from + delta * 0.5f,
+		len * overlap, thickness * 2.0f,
+		Vector2_ToAngle(delta),
+		color, alpha);
+}
+
 void DrawPrim_Rect(const Vector2& center, float width, float height, float angle,
 	const XMFLOAT3& color, float alpha)
 {
@@ -48,20 +62,6 @@ void DrawPrim_Rect(const Vector2& center, float width, float height, float angle
 		Camera_WorldToScreenY(center.y - height * 0.5f),
 		width, height,
 		p);
-}
-
-void DrawPrim_Line(const Vector2& from, const Vector2& to, float thickness,
-	const XMFLOAT3& color, float alpha)
-{
-	const Vector2 delta = to - from;
-	const float   len = delta.Length();
-	if (len < 0.5f) { return; }     
-	if (len > 3000.0f) { return; }
-
-	DrawPrim_Rect(from + delta * 0.5f,               // midpoint
-		len, thickness * 2.0f,
-		Vector2_ToAngle(delta),
-		color, alpha);
 }
 
 void DrawPrim_Beam(const Vector2& from, const Vector2& to, float thickness,
@@ -109,13 +109,11 @@ void DrawPrim_Trail(const Vector2* points, int count, float thickness,
 
 	for (int i = 0; i < count - 1; i++)
 	{
-		// t = 0 at the tail, 1 at the head
 		const float t = static_cast<float>(i + 1) / static_cast<float>(count - 1);
-
 		const float a = alpha_tail + (alpha_head - alpha_tail) * t;
-		const float w = thickness * (0.25f + 0.75f * t);   // taper toward the tail
+		const float w = thickness * (0.25f + 0.75f * t);
 
-		DrawPrim_Line(points[i], points[i + 1], w, color, a);
+		DrawPrim_Line(points[i], points[i + 1], w, color, a, 1.18f);
 	}
 }
 
@@ -124,11 +122,10 @@ void DrawPrim_Ring(const Vector2& center, float radius, float thickness,
 {
 	if (radius <= 0.5f || alpha <= 0.0f) { return; }
 
-	// Segments scale with size: a small ring needs few, a big one needs
+	// Segments scale with size
 	const int segments = std::clamp(static_cast<int>(radius * 0.35f), 10, 36);
 	const float step = TWO_PI_PRIM / segments;
 
-	// Each segment is slightly long so the joins do not gap.
 	const float seg_len = radius * step * 1.15f;
 
 	for (int i = 0; i < segments; i++)

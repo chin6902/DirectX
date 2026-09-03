@@ -64,9 +64,10 @@ void GameSkill_Initialize();
 void GameSkill_Finalize();
 void GameSkill_Update(float delta_time);
 void GameSkill_Draw();
+void GameSkill_DrawUnder();
 
 SkillId GameSkill_Lookup(const int* counts);
-void GameSkill_Cast(SkillId id, const Vector2& origin, const Vector2& aim, int power);
+void GameSkill_Cast(SkillId id, const Vector2& origin, const Vector2& aim, int power, unsigned int element_mask = 0);
 
 void GameSkill_CastUltimate(ElementType e, const Vector2& origin, const Vector2& aim);
 

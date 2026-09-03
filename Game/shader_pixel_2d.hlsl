@@ -1,20 +1,14 @@
-// Constant buffer
-cbuffer ColorBuffer : register(b0)
-{
-    float4 color; 
-}
+Texture2D major_texture : register(t0);
+SamplerState major_sampler : register(s0);
 
-struct PS_INPUT
+struct PS_IN
 {
-    float4 posH : SV_POSITION;
+    float4 position : SV_POSITION;
     float2 uv : TEXCOORD0;
+    float4 color : COLOR0;
 };
 
-Texture2D major_texture : register(t0); // テクスチャ
-SamplerState major_sampler : register(s0); // サンプラー
-
-float4 main(PS_INPUT input) : SV_TARGET
+float4 main(PS_IN input) : SV_TARGET
 {
-	return major_texture.Sample(major_sampler, input.uv) * color;
+    return major_texture.Sample(major_sampler, input.uv) * input.color;
 }
-

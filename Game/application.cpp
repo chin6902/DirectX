@@ -19,6 +19,7 @@ LastUpdate : 2026/06/15
 #include "input_mouse.h"
 #include "input_xinput.h"
 #include "Audio.h"
+#include "game_audio.h"
 
 static int g_mouseX = 0;
 static int g_mouseY = 0;
@@ -30,7 +31,8 @@ bool Application_Initialize(HWND hWnd)
 		return false;
 	}
 
-	InitAudio();
+	Audio_Initialize();
+	GameAudio_Initialize();
 
 	// 各システムの初期化
 	InputKeyboard_Initialize();
@@ -58,7 +60,8 @@ void Application_Finalize()
 	Shader_Finalize();
 
 	InputMouse_Finalize();
-	UninitAudio();
+	Audio_Finalize();
+	GameAudio_Finalize();
 	Direct3DFinalize();
 }
 
@@ -69,6 +72,7 @@ void Application_Update(float delta_time)
 	// ゲームの更新処理
 	InputKeyboard_Update(delta_time);
 	InputMouse_Update();
+	Audio_Update(delta_time);
 	/*
 		InputXInput_Update(delta_time);
 		g_mouseX = InputMouse_GetX();
@@ -87,5 +91,6 @@ void Application_Draw()
 {
 	Scene_Draw();
 	Fade_Draw();
+	Sprite_Flush();
 }
 

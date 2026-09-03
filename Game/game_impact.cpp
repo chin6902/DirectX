@@ -9,7 +9,6 @@ LastUpdate : 2026/07/06
 #include "texture.h"
 #include "game_impact.h"
 #include "flipbook_animation.h"
-#include "Audio.h"
 
 struct ExplosionInfo
 {
@@ -84,8 +83,6 @@ void GameImpact_Initialize()
             data.is_active = false;
         }
     }
-
-    g_explosionSoundID = LoadAudio("assets/sounds/explosion.wav");
 }
 
 void GameImpact_Finalize()
@@ -102,8 +99,6 @@ void GameImpact_Finalize()
         Texture_Release(g_ExplosionInfo[type].texture_id);
         g_ExplosionInfo[type].texture_id = -1;
     }
-
-	UnloadAudio(g_explosionSoundID);
 }
 
 void GameImpact_Trigger(ExplosionType type, float x, float y)
@@ -123,7 +118,6 @@ void GameImpact_Trigger(ExplosionType type, float x, float y)
         data.x = x;
         data.y = y;
         data.is_active = true;
-        //PlayAudio(g_explosionSoundID);
         return;
     }
 }
