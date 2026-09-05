@@ -65,6 +65,7 @@ void GameSkill_Finalize();
 void GameSkill_Update(float delta_time);
 void GameSkill_Draw();
 void GameSkill_DrawUnder();
+void GameSkill_DrawOverlay();
 
 SkillId GameSkill_Lookup(const int* counts);
 void GameSkill_Cast(SkillId id, const Vector2& origin, const Vector2& aim, int power, unsigned int element_mask = 0);

@@ -8,6 +8,7 @@ LastUpdate : 2026/06/01
 ============================================================================*/
 #include "Window.h"
 #include "config.h"
+#include "resource.h"
 
 #include <algorithm>
 
@@ -29,11 +30,11 @@ namespace
 			.style = CS_HREDRAW | CS_VREDRAW,
 			.lpfnWndProc = wndProc,
 			.hInstance = hInstance,
-			.hIcon = LoadIcon(hInstance, IDI_APPLICATION),
+			.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_GAME_ICON)),
 			.hCursor = LoadCursor(nullptr, IDC_ARROW),
 			.hbrBackground = static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)),
 			.lpszClassName = WINDOW_CLASS,
-			.hIconSm = LoadIcon(hInstance, IDI_APPLICATION),
+			.hIconSm = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_GAME_ICON)),
 		};
 
 		if (RegisterClassEx(&wcex) == 0)

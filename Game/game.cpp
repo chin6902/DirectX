@@ -33,6 +33,7 @@ LastUpdate : 2026/06/24
 #include "game_expgem.h"
 #include "enemy_projectile.h"
 #include "game_boss.h"
+#include "boss_wall.h"
 #include "enemy_formation.h"
 #include "game_damagenumber.h"
 #include "flow_field.h"
@@ -82,6 +83,7 @@ void Game_Initialize()
 	EnemyProjectile_Initialize();
 	GameExpGem_Initialize();
 	GameBoss_Initialize();
+	BossWall_Initialize();
 	EnemyFormation_Initialize();
 	GameDamageNumber_Initialize();
 	GameItem_Initialize();
@@ -113,6 +115,7 @@ void Game_Finalize()
 	EnemyProjectile_Finalize();
 	GameExpGem_Finalize();
 	GameBoss_Finalize();
+	BossWall_Finalize();
 	EnemyFormation_Finalize();
 	FlowField_Finalize();
 	GameText_Finalize();
@@ -150,6 +153,7 @@ static void UpdateEndHold(float delta_time)
 	GameUI_Update(delta_time);
 	GamePlayer_Update(delta_time);
 	GameEnemy_CleanUp();
+	GameEnemy_BuildGrid();
 
 	if (g_EndTimer > 0.0f)
 	{
@@ -173,9 +177,11 @@ void Game_Update(float delta_time)
 		else if (g_gameState == STATE_PAUSE) { g_gameState = STATE_PLAYING; }
 	}
 
+	if (InputKeyboard_IsTrigger(KK_O)) { GameProgress_AddXP(50); }
 #ifdef _DEBUG
-	if (InputKeyboard_IsTrigger(KK_O))  { GameProgress_AddXP(50); }
-	if (InputKeyboard_IsTrigger(KK_F1)) { GameBoss_Spawn(GamePlayer_GetPos() + Vector2{ 100.0f, 0.0f }, 3, false); }
+	if (InputKeyboard_IsTrigger(KK_F1)) { GameBoss_Spawn(GamePlayer_GetPos() + Vector2{ 300.0f, 0.0f }, 1, false); }
+	if (InputKeyboard_IsTrigger(KK_F2)) { GameBoss_Spawn(GamePlayer_GetPos() + Vector2{ 300.0f, 0.0f }, 2, false); }
+	if (InputKeyboard_IsTrigger(KK_F3)) { GameBoss_Spawn(GamePlayer_GetPos() + Vector2{ 300.0f, 0.0f }, 3, false); }
 	if (InputKeyboard_IsTrigger(KK_T))  { EnterEndState(true); }
 	if (InputKeyboard_IsTrigger(KK_Y))  { EnterEndState(false); }
 #endif
@@ -200,6 +206,7 @@ void Game_Update(float delta_time)
 		GameExpGem_Update(delta_time);
 		EnemyProjectile_Update(delta_time);
 		GameBoss_Update(delta_time);
+		BossWall_Update(delta_time);
 		EnemyFormation_Update(delta_time);
 		GameDamageNumber_Update(delta_time);
 		GameItem_Update(delta_time);
@@ -211,7 +218,9 @@ void Game_Update(float delta_time)
 		GameUI_Update(delta_time);
 		MouseUI_Update(delta_time);
 		WaveBanner_Update(delta_time);
+
 		GameEnemy_CleanUp();
+		GameEnemy_BuildGrid();
 
 		if (!g_RunStarted && (GameEnemy_GetActiveCount() > 0 || GameBoss_AnyActive()))
 		{
@@ -266,6 +275,7 @@ void Game_Draw()
 	GameSkill_DrawUnder();
 	GameEnemy_Draw();
 	GameSkill_Draw();
+	BossWall_Draw();
 	GameBoss_Draw();
 	EnemyFormation_Draw();
 	GameDamageNumber_Draw();
@@ -273,6 +283,7 @@ void Game_Draw()
 
 	// --- UI ---
 	GameUI_Draw();
+	GameSkill_DrawOverlay();
 	MouseUI_Draw();
 	GameBoss_DrawUI();
 	WaveBanner_DrawCounter();
@@ -328,6 +339,25 @@ void Collision_CheckPlayerVsEnemies()
 		const Vector2 away = player_pos - GameEnemy_GetPos(i);
 		hit.direction = (away.LengthSq() < 0.01f) ? Vector2{ 1.0f, 0.0f } : Vector2_Normalize(away);
 
+		GamePlayer_TakeHit(hit);
+		return;
+	}
+
+	for (int i = 0; i < BOSS_MAX; i++)
+	{
+		if (!GameBoss_IsActive(i) || !GameBoss_IsGrounded(i)) { continue; }
+
+		const Vector2 boss_pos = GameBoss_GetPos(i);
+		const CollisionCircle boss_circle{ { boss_pos.x, boss_pos.y }, GameBoss_GetRadius(i) };
+		if (!Collision_IsOverlap(player_circle, boss_circle)) { continue; }
+
+		PlayerHit hit;
+		hit.damage = static_cast<int>(BOSS_CONTACT_DAMAGE);
+		hit.knockback_speed = 820.0f;
+		hit.knockback_time = 0.70f;
+
+		const Vector2 away = player_pos - boss_pos;
+		hit.direction = (away.LengthSq() < 0.01f) ? Vector2{ 1.0f, 0.0f } : Vector2_Normalize(away);
 		GamePlayer_TakeHit(hit);
 		return;
 	}

@@ -22,8 +22,8 @@ LastUpdate : 2026/08/01
 static constexpr float ATTACK_COOLDOWN = 3.0f;
 static constexpr float ATTACK_RANGE = 150.0f;
 static constexpr int   ATTACK_DAMAGE = 1;
-static constexpr float ATTACK_HALF_ANGLE = 0.7853f;            // 45 deg -> 90 deg cone
-static const float COS_HALF_ANGLE = cosf(ATTACK_HALF_ANGLE);   // hoisted, computed once
+static constexpr float ATTACK_HALF_ANGLE = 0.7853f;            
+static const float COS_HALF_ANGLE = cosf(ATTACK_HALF_ANGLE);   
 
 static float g_CooldownTimer = 0.0f;
 static float g_SwingFlashTimer = 0.0f;  
@@ -106,7 +106,7 @@ void PlayerAttack_Update(float delta_time)
 
 		HitInfo hit;
 		hit.damage = ATTACK_DAMAGE;
-		hit.knockback_speed = 250.0f;      // light tap
+		hit.knockback_speed = 250.0f;      
 		hit.knockback_time = 0.12f;
 		hit.hitstun_time = 0.20f;
 		hit.direction = Vector2_Normalize(to_enemy);

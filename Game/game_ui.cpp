@@ -28,7 +28,7 @@ static constexpr float HP_Y = SCREEN_HEIGHT - 78.0f;
 static constexpr float HP_W = 360.0f;
 static constexpr float HP_H = 26.0f;
 
-// --- player bars stacked ABOVE the HP bar ---
+// --- player bars ---
 static constexpr float BAR_GAP = 8.0f;
 static constexpr float GUTTER = 36.0f;                      
 static constexpr float ULT_BAR_H = 16.0f;
@@ -148,7 +148,7 @@ static void DrawHealthBar()
 	GameText_Draw(HP_X + 6.0f, HP_Y + HP_H + 8.0f, hp, 0.40f, { 0.85f, 0.87f, 0.92f });
 }
 
-// --- ULT meter, relocated to sit directly above the HP bar ------------------
+// --- ULT meter above the HP bar ---
 static void DrawUltimateBar()
 {
 	const float ult = PlayerCharge_GetUltimateFraction();

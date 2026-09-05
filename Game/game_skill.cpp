@@ -27,6 +27,7 @@ The grid must be built before skills query it(SpatialGrid_Insert)
 #include "game_boss.h"
 #include "game_damagenumber.h"
 #include "game_item.h"
+#include "boss_wall.h"
 #include "game_audio.h"
 
 using namespace DirectX;
@@ -533,7 +534,7 @@ static constexpr SkillDef g_SkillDefs[SKILL_ID_COUNT] =
 	/* 20 ULT_FIRE_3  meteor storm */
 	{
 		.element = ELEMENT_FIRE,
-		.motion = {.count = 9, .scatter = 420.0f, .stagger = 0.13f },
+		.motion = {.mode = MOTION_AT_CURSOR, .count = 9, .scatter = 420.0f, .stagger = 0.13f },
 		.life = 0.70f,
 		.spawn_delay = 0.70f,
 		.hitbox = {.radius = 80.0f },
@@ -555,7 +556,7 @@ static constexpr SkillDef g_SkillDefs[SKILL_ID_COUNT] =
 		.life = 0.60f,
 		.hitbox = {.radius = 350.0f, .grow = true },
 		.impact = {.damage_mul = 0.5f, .kb_speed = 260.0f, .kb_time = 0.20f, .stun_time = 0.30f },
-		.status = { { STATUS_SLOW, 4.0f, 0.35f } },
+		.status = { { STATUS_SLOW, 7.0f, 0.35f } },
 		.color = { 0.65f, 0.92f, 1.00f },
 		.hitstop = 0.06f,
 		.draw_style = DRAW_RING,
@@ -752,6 +753,28 @@ static void SpawnArc(const Vector2& from, const Vector2& to, const XMFLOAT3& col
 		if (a.active) { continue; }
 		a.from = from; a.to = to; a.life = ARC_LIFE; a.color = color; a.active = true;
 		return;
+	}
+}
+
+// --- Ice screen overlay -------------------------------------------
+static constexpr float FROST_OVERLAY_TIME = 1.50f;   
+static float g_FrostTimer = 0.0f;
+
+static constexpr int   FLAKE_MAX = 48;
+struct Flake { float x, y, vx, vy, size; };
+static Flake g_Flakes[FLAKE_MAX]{};
+
+static void FrostOverlay_Begin()
+{
+	g_FrostTimer = FROST_OVERLAY_TIME;
+
+	for (Flake& f : g_Flakes)
+	{
+		f.x = static_cast<float>(rand() % SCREEN_WIDTH);
+		f.y = static_cast<float>(rand() % SCREEN_HEIGHT);
+		f.vx = -30.0f - static_cast<float>(rand() % 50);   
+		f.vy = 20.0f + static_cast<float>(rand() % 40);
+		f.size = 2.0f + static_cast<float>(rand() % 3);
 	}
 }
 
@@ -1051,6 +1074,9 @@ static void InstanceCap(SkillId id, int max_instances, int per_cast)
 	}
 }
 
+//==============================================================================================
+// Cast
+//==============================================================================================
 void GameSkill_Cast(SkillId id, const Vector2& origin, const Vector2& aim, int power, unsigned int element_mask)
 {
 	if (id == SKILL_NONE) { return; }
@@ -1060,6 +1086,7 @@ void GameSkill_Cast(SkillId id, const Vector2& origin, const Vector2& aim, int p
 
 	GameAudio_PlayPitched(def.sound, def.sound_pitch);
 
+	if (id == SKILL_ABSOLUTE_ZERO) { FrostOverlay_Begin(); }
 	InstanceCap(id, def.max_instances, count);
 
 	int spawned = 0;
@@ -1230,6 +1257,35 @@ void GameSkill_CastUltimate(ElementType e, const Vector2& origin, const Vector2&
 // ============================================================================
 // Damage
 // ============================================================================
+static void TryHitWall(SkillInstance& s, const SkillDef& def)
+{
+	const int count = BossWall_GetSegmentCount();
+
+	for (int i = 0; i < count; i++)
+	{
+		if (!BossWall_IsSegmentAlive(i)) { continue; }
+
+		const int wall_hit_id = -200 - i;
+		if (AlreadyHit(s, wall_hit_id)) { continue; }
+
+		const Vector2 wp = BossWall_GetSegmentPos(i);
+		if (!InHitbox(s, def, wp, BossWall_GetSegmentRadius(i))) { continue; }
+
+		RememberHit(s, wall_hit_id);
+
+		HitInfo hit;
+		hit.damage = 0.0f;
+		hit.element_mask = s.element_mask;
+		hit.hitstun_time = 0.0f;
+		hit.direction = Vector2_Normalize(wp - s.pos);
+
+		if (BossWall_ApplyHit(i, hit))
+		{
+			GameAudio_PlayPitched(def.hit_sound, def.hit_pitch);
+		}
+	}
+}
+
 static bool TryHitBoss(SkillInstance& s, const SkillDef& def)
 {
 	bool hit_any = false;
@@ -1299,6 +1355,7 @@ static float QueryReach(const SkillDef& def)
 
 static void DamagePass(SkillInstance& s, const SkillDef& def)
 {
+	TryHitWall(s, def);
 	const bool hit_boss = TryHitBoss(s, def);
 	if (hit_boss && def.motion.mode == MOTION_LINEAR && def.target.hit_interval <= 0.0f && s.hit_count > def.target.max_pierce)
 	{
@@ -1314,8 +1371,20 @@ static void DamagePass(SkillInstance& s, const SkillDef& def)
 
 	if (def.hitbox.screen_wide)
 	{
-		candidate_count = std::min(GameEnemy_GetActiveCount(), SKILL_QUERY_MAX);
-		for (int k = 0; k < candidate_count; k++) { candidates[k] = k; }
+		constexpr float MARGIN = 64.0f;
+		const float min_x = Camera_GetX() - MARGIN;
+		const float min_y = Camera_GetY() - MARGIN;
+		const float max_x = Camera_GetX() + SCREEN_WIDTH + MARGIN;
+		const float max_y = Camera_GetY() + SCREEN_HEIGHT + MARGIN;
+
+		const int active = GameEnemy_GetActiveCount();
+		for (int k = 0; k < active && candidate_count < SKILL_QUERY_MAX; k++)
+		{
+			const CollisionCircle cc = GameEnemy_GetCollisionCircle(k);
+			if (cc.position.x < min_x || cc.position.x > max_x) { continue; }
+			if (cc.position.y < min_y || cc.position.y > max_y) { continue; }
+			candidates[candidate_count++] = k;
+		}
 	}
 	else
 	{
@@ -1425,6 +1494,18 @@ void GameSkill_Update(float delta_time)
 		if (!a.active) { continue; }
 		a.life -= delta_time;
 		if (a.life <= 0.0f) { a.active = false; }
+	}
+
+	if (g_FrostTimer > 0.0f)
+	{
+		g_FrostTimer -= delta_time;
+		for (Flake& f : g_Flakes)
+		{
+			f.x += f.vx * delta_time;
+			f.y += f.vy * delta_time;
+			if (f.y > SCREEN_HEIGHT) { f.y -= SCREEN_HEIGHT; }
+			if (f.x < 0.0f) { f.x += SCREEN_WIDTH; }
+		}
 	}
 
 	for (SkillInstance& s : g_Instances)
@@ -1726,7 +1807,11 @@ static void DrawInstances(bool under_layer)
 			}
 			else
 			{
-				DrawPrim_Beam(a, b, def.hitbox.thickness, def.color, 1.0f);
+				const float vis = std::max(0.0001f, s.max_life - def.spawn_delay);
+				const float beam_t = ((s.max_life - s.life) - def.spawn_delay) / vis;
+				const float grow = std::min(1.0f, beam_t / 0.35f);                       
+				const float fade = (beam_t <= 0.70f) ? 1.0f : 1.0f - (beam_t - 0.70f) / 0.30f;
+				DrawPrim_BeamGrow(a, b, def.hitbox.thickness, def.color, grow, fade);
 			}
 
 #ifdef _DEBUG
@@ -1783,6 +1868,27 @@ static void DrawInstances(bool under_layer)
 		if (def.draw_style == DRAW_RING)
 		{
 			DrawPrim_Ring(s.pos, s.visual_radius, 3.0f, def.color, 0.85f);
+
+			if (def.element == ELEMENT_ICE && def.hitbox.radius > 300.0f)
+			{
+				const float t = 1.0f - (s.life / s.max_life);
+				const float haze = (1.0f - t) * 0.45f;
+
+				constexpr int MOTES = 22;
+				for (int k = 0; k < MOTES; k++)
+				{
+					// fixed per-instance scatter: serial keeps it stable frame to frame
+					const unsigned int h = static_cast<unsigned int>(s.serial * 73856093 + k * 19349663);
+					const float ang = (h % 628) * 0.01f;
+					const float rad = s.visual_radius * (0.15f + 0.85f * ((h >> 9) % 100) * 0.01f);
+					const float sz = 1.5f + ((h >> 17) % 3);
+
+					const Vector2 p{ s.pos.x + cosf(ang) * rad,
+									 s.pos.y + sinf(ang) * rad };
+
+					DrawPrim_Circle(p, sz, { 1.0f, 1.0f, 1.0f }, haze);
+				}
+			}
 		}
 		else if (def.draw_style == DRAW_TESLA)
 		{
@@ -1821,4 +1927,41 @@ void GameSkill_Draw()
 	}
 
 	DrawInstances(false);
+}
+
+void GameSkill_DrawOverlay()
+{
+	if (g_FrostTimer <= 0.0f) { return; }
+
+	// ease in fast, fade out over the tail
+	const float t = g_FrostTimer / FROST_OVERLAY_TIME;
+	const float in = std::min(1.0f, (1.0f - t) / 0.12f);
+	const float a = in * std::min(1.0f, t / 0.45f);
+
+	// --- gradient border
+	constexpr int BANDS = 10;
+	constexpr float DEPTH = 130.0f;
+	for (int i = 0; i < BANDS; i++)
+	{
+		const float f = static_cast<float>(i) / BANDS;
+		const float inset = DEPTH * f;
+		const float band = DEPTH / BANDS + 1.0f;
+		const float ba = a * 0.16f * (1.0f - f);
+
+		// blue at the edge -> white as it moves inward
+		const XMFLOAT3 col{ 0.55f + 0.45f * f, 0.80f + 0.20f * f, 1.0f };
+
+		GameUI_DrawScreenRect(inset, inset, SCREEN_WIDTH - inset * 2.0f, band, col, ba);
+		GameUI_DrawScreenRect(inset, SCREEN_HEIGHT - inset - band,
+			SCREEN_WIDTH - inset * 2.0f, band, col, ba);
+		GameUI_DrawScreenRect(inset, inset, band, SCREEN_HEIGHT - inset * 2.0f, col, ba);
+		GameUI_DrawScreenRect(SCREEN_WIDTH - inset - band, inset,
+			band, SCREEN_HEIGHT - inset * 2.0f, col, ba);
+	}
+
+	// --- snowflakes
+	for (const Flake& f : g_Flakes)
+	{
+		GameUI_DrawScreenRect(f.x, f.y, f.size, f.size, { 1.0f, 1.0f, 1.0f }, a * 0.85f);
+	}
 }

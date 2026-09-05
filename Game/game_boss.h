@@ -11,8 +11,10 @@ LastUpdate : 2026/08/18
 
 #include "vector2.h"
 #include "game_enemy.h"   
+#include "boss_visual.h"
 
 inline constexpr int BOSS_MAX = 2;
+constexpr float BOSS_CONTACT_DAMAGE = 1.0f;
 
 void GameBoss_Initialize();
 void GameBoss_Finalize();
@@ -29,6 +31,7 @@ float       GameBoss_GetRadius(int index);
 float       GameBoss_GetHPFraction(int index);
 bool        GameBoss_HasShield(int index);
 ElementType GameBoss_GetShieldElement(int index);
+bool		GameBoss_IsGrounded(int index);
 
 bool GameBoss_ApplyHit(int index, const HitInfo& hit);
 void GameBoss_ApplyStatus(int index, StatusType type, float duration, float magnitude);

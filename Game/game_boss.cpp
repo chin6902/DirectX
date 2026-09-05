@@ -2,9 +2,15 @@
 Contents   :  [game_boss.cpp]
 
 Author     : Chin Qing You
-LastUpdate : 2026/08/19
+LastUpdate : 2026/09/04
 -----------------------------------------------------------------------------
+Boss state and behaviour. All rendering lives in boss_visual.cpp.
 
+Variants are wave-ordered and named by behaviour, so the variant index IS
+the behaviour tag:
+	0 BOSS_VARIANT_BASIC  (Slime1) - jump/slam only
+	1 BOSS_VARIANT_LASER  (Slime3) - jump/slam + sweeping laser
+	2 BOSS_VARIANT_WALL   (Slime2) - jump/slam + wall ring + radial burst
 ============================================================================*/
 #include <algorithm>
 #include <cmath>
@@ -19,18 +25,18 @@ LastUpdate : 2026/08/19
 #include "enemy_formation.h"
 #include "camera.h"
 #include "config.h"
-#include "texture.h"
 #include "sprite.h"
 #include "draw_primitives.h"
 #include "game_text.h"
 #include "game_ui.h"
 #include "game_damagenumber.h"
+#include "boss_wall.h"
+#include "enemy_projectile.h"
 #include "game_audio.h"
 
 using namespace DirectX;
 
-static constexpr int   BOSS_VARIANT_COUNT = 2;
-static constexpr float BOSS_MAX_HP[BOSS_VARIANT_COUNT] = { 750.0f, 950.0f };
+static constexpr float BOSS_MAX_HP[BOSS_VARIANT_COUNT] = { 750.0f, 750.0f, 700.0f };
 
 static constexpr float BOSS_RADIUS = 52.0f;
 static constexpr float BOSS_DRAW_SIZE = 160.0f;
@@ -43,11 +49,40 @@ static constexpr float LAND_RECOVER_TIME = 0.90f;
 static constexpr float DEATH_TIME = 1.20f;
 
 static constexpr float SLAM_RADIUS = 150.0f;
-static constexpr int   SLAM_DAMAGE = 3;
+static constexpr float SLAM_DAMAGE = 4.0f;
 static constexpr float SLAM_KNOCKBACK = 520.0f;
 
-static constexpr float JUMP_ARC_HEIGHT = 190.0f;   
+static constexpr float JUMP_ARC_HEIGHT = 190.0f;
 static constexpr int   JUMPS_PER_SHIELD = 3;
+
+// --- specials ---
+static constexpr int   JUMPS_PER_SPECIAL = 2;
+static constexpr float SPECIAL_TIME = 2.00f;   
+
+static constexpr float SLAM_DAMAGE_MUL[BOSS_VARIANT_COUNT] = { 1.0f, 0.5f, 0.75f };
+
+// --- laser (BOSS_VARIANT_LASER) ---
+static constexpr float LASER_WINDUP = 0.60f;   
+static constexpr float LASER_LOCK = 0.30f;  
+static constexpr float LASER_SWEEP = 2.40f;
+static constexpr float LASER_RANGE = 1400.0f;
+static constexpr float LASER_THICKNESS = 30.0f;
+static constexpr float LASER_TURN_RATE = 0.45f;   
+static constexpr int   LASER_DAMAGE = 2;
+static constexpr int   LASER_MOTE_COUNT = 24;
+static constexpr float LASER_MOTE_RADIUS = 150.0f;   
+static constexpr float LASER_MOTE_STREAK = 18.0f;
+static constexpr float LASER_MOTE_CYCLES = 3.0f;
+static constexpr XMFLOAT3 LASER_COLOR{ 1.00f, 0.16f, 0.10f };
+static constexpr XMFLOAT3 MOTE_COLOR{ 0.479f, 0.08f, 0.08f };
+
+// --- wall (BOSS_VARIANT_WALL) ---
+static constexpr float WALL_CAST_TIME = 1.20f;
+static constexpr float BURST_INTERVAL = 1.60f;
+static constexpr int   BURST_COUNT = 6;
+static constexpr float BURST_SPEED = 260.0f;
+static constexpr int   BURST_DAMAGE = 2;
+static constexpr XMFLOAT3 BURST_COLOR{ 0.85f, 0.45f, 0.00f };
 
 static constexpr float SHAKE_STRENGTH = 26.0f;
 static constexpr float SHAKE_TIME = 0.35f;
@@ -59,24 +94,12 @@ static constexpr float SUMMON_INTERVAL_P3 = 7.0f;
 
 static constexpr float BOSS_STATUS_RESIST = 0.4f;
 static constexpr float BURN_TICK_INTERVAL = 0.5f;
-static constexpr float CLOCK_FLOOR = 0.25f;   
+static constexpr float CLOCK_FLOOR = 0.25f;
 
 static constexpr float STAGGER_PER_INDEX = 1.10f;
 
-static constexpr int   DEATH_GEM_COUNT = 30;
+static constexpr int   DEATH_GEM_COUNT = 24;
 static constexpr int   DEATH_GEM_VALUE = 6;
-
-// --- sprite sheets ---
-static constexpr int SHEET_CELL = 64;
-static constexpr int IDLE_FRAMES = 6;
-static constexpr int RUN_FRAMES = 8;
-static constexpr int ATK_FRAMES = 11;
-static constexpr int DEATH_FRAMES = 10;
-
-static constexpr int ROW_DOWN = 0;
-static constexpr int ROW_UP = 1;
-static constexpr int ROW_LEFT = 2;
-static constexpr int ROW_RIGHT = 3;
 
 enum BossState
 {
@@ -84,6 +107,7 @@ enum BossState
 	BOSS_TELEGRAPH,
 	BOSS_AIRBORNE,
 	BOSS_LAND,
+	BOSS_SPECIAL,
 	BOSS_DEAD,
 };
 
@@ -97,8 +121,8 @@ struct BossStatus
 struct Boss
 {
 	bool        active = false;
-	int         variant = 0;      
-	bool        summons = true;   
+	int         variant = 0;
+	bool        summons = true;
 
 	BossState   state = BOSS_APPROACH;
 	float       state_timer = 0.0f;
@@ -111,9 +135,16 @@ struct Boss
 
 	float       flash_timer = 0.0f;
 
-	int         jump_count = 0;
+	int         jump_count = 0;      
 	bool        shield_up = false;
 	ElementType shield_element = ELEMENT_FIRE;
+
+	int         special_jumps = 0;   
+
+	bool		laser_firing = false;
+	float		laser_angle = 0.0f;
+
+	float       burst_timer = 0.0f;
 
 	int         phase = 1;
 	float       summon_timer = 0.0f;
@@ -127,10 +158,7 @@ struct Boss
 
 static Boss g_Bosses[BOSS_MAX]{};
 
-static int g_tex_idle[BOSS_VARIANT_COUNT] = { -1, -1 };
-static int g_tex_run[BOSS_VARIANT_COUNT] = { -1, -1 };
-static int g_tex_atk[BOSS_VARIANT_COUNT] = { -1, -1 };
-static int g_tex_death[BOSS_VARIANT_COUNT] = { -1, -1 };
+static int g_SpecialTurn = BOSS_VARIANT_LASER;
 
 static bool ValidIndex(int index)
 {
@@ -144,55 +172,188 @@ static void RollShield(Boss& b)
 	b.jump_count = 0;
 }
 
-static XMFLOAT3 ElementColor(ElementType e)
+// ============================================================================
+// Specials 
+// ============================================================================
+static float WrapAngle(float a)
 {
-	switch (e)
+	while (a > XM_PI) { a -= XM_2PI; }
+	while (a < -XM_PI) { a += XM_2PI; }
+	return a;
+}
+
+static float PointToSegmentDistSq(const Vector2& p, const Vector2& a, const Vector2& b)
+{
+	const Vector2 ab = b - a;
+	const float len_sq = ab.LengthSq();
+	if (len_sq <= 0.0001f) { return (p - a).LengthSq(); }
+
+	const float t = std::clamp(Vector2_Dot(p - a, ab) / len_sq, 0.0f, 1.0f);
+	return (p - (a + ab * t)).LengthSq();
+}
+
+static Vector2 LaserEnd(const Boss& b)
+{
+	return b.pos + Vector2_FromAngle(b.laser_angle) * LASER_RANGE;
+}
+
+static float SpecialDuration(int variant)
+{
+	switch (variant)
 	{
-	case ELEMENT_FIRE:    return { 1.00f, 0.35f, 0.10f };
-	case ELEMENT_ICE:     return { 0.30f, 0.70f, 1.00f };
-	case ELEMENT_THUNDER: return { 1.00f, 0.90f, 0.20f };
-	default:              return { 1.00f, 1.00f, 1.00f };
+	case BOSS_VARIANT_LASER: return LASER_WINDUP + LASER_LOCK + LASER_SWEEP;
+	case BOSS_VARIANT_WALL:  return WALL_CAST_TIME;
+	default:                 return SPECIAL_TIME;
 	}
 }
 
-static int FacingRow(const Vector2& dir)
+static void FireRadialBurst(const Boss& b)
 {
-	if (fabsf(dir.x) > fabsf(dir.y)) { return (dir.x > 0.0f) ? ROW_RIGHT : ROW_LEFT; }
-	return (dir.y > 0.0f) ? ROW_DOWN : ROW_UP;
+	const float spin = static_cast<float>(rand() % 628) * 0.01f;
+
+	for (int i = 0; i < BURST_COUNT; i++)
+	{
+		const float a = spin + (XM_2PI * static_cast<float>(i)) / static_cast<float>(BURST_COUNT);
+		EnemyProjectile_Fire(b.pos, Vector2_FromAngle(a), BURST_SPEED, BURST_DAMAGE, BURST_COLOR);
+	}
+
+	GameAudio_Play(SND_BOSS_SHOOT);
+}
+
+static void BeginSpecial(Boss& b)
+{
+	if (b.variant == BOSS_VARIANT_LASER)
+	{
+		b.laser_angle = Vector2_ToAngle(GamePlayer_GetPos() - b.pos);
+		b.laser_firing = false;
+		GameAudio_Play(SND_BOSS_LASER_CHARGE);
+	}
+
+	if (b.variant == BOSS_VARIANT_WALL)
+	{
+		BossWall_SpawnRing(GamePlayer_GetPos());
+		b.burst_timer = BURST_INTERVAL * 0.5f;
+		Camera_Shake(14.0f, 0.30f);
+		GameAudio_Play(SND_BOSS_WALL);	
+	}
+}
+
+static void UpdateSpecial(Boss& b, float scaled_dt)
+{
+	if (b.variant != BOSS_VARIANT_LASER) { return; }
+
+	const Vector2 player = GamePlayer_GetPos();
+
+	// --- windup
+	if (b.state_timer > LASER_LOCK + LASER_SWEEP)
+	{
+		b.laser_angle = Vector2_ToAngle(player - b.pos);
+		return;
+	}
+
+	// --- lock
+	if (b.state_timer > LASER_SWEEP)
+	{
+		return;
+	}
+
+	if (!b.laser_firing)
+	{
+		b.laser_firing = true;
+		GameAudio_Play(SND_BOSS_LASER);
+	}
+
+	// --- capped rotation toward the player
+	const float want = Vector2_ToAngle(player - b.pos);
+	const float delta = WrapAngle(want - b.laser_angle);
+	const float step = LASER_TURN_RATE * scaled_dt;
+
+	b.laser_angle += std::clamp(delta, -step, step);
+	b.laser_angle = WrapAngle(b.laser_angle);
+
+	const CollisionCircle pc = GamePlayer_GetCollisionCircle();
+	const Vector2 pp{ pc.position.x, pc.position.y };
+
+	const float reach = LASER_THICKNESS * 0.5f + pc.radius;
+	if (PointToSegmentDistSq(pp, b.pos, LaserEnd(b)) < reach * reach)
+	{
+		PlayerHit hit;
+		hit.damage = LASER_DAMAGE;
+		hit.knockback_speed = 260.0f;
+		hit.knockback_time = 0.18f;
+		hit.direction = Vector2_FromAngle(b.laser_angle);
+		GamePlayer_TakeHit(hit);
+	}
+}
+
+static void EndSpecial(Boss& b)
+{
+	if (b.variant == BOSS_VARIANT_LASER && b.laser_firing)
+	{
+		b.laser_firing = false;
+		GameAudio_Stop(SND_BOSS_LASER);
+	}
 }
 
 static void EnterDeath(Boss& b)
 {
+	EndSpecial(b);           
+
+	if (b.variant == BOSS_VARIANT_WALL) { BossWall_ClearAll(); }
+
 	b.state = BOSS_DEAD;
 	b.state_timer = DEATH_TIME;
 	b.anim_frame = 0;
 	b.anim_timer = 0.0f;
 }
 
+// ============================================================================
+// Special turn taking
+// ============================================================================
+static bool SpecialAvailable(const Boss& b)
+{
+	if (b.variant == BOSS_VARIANT_BASIC) { return false; }
+
+	if (b.variant == BOSS_VARIANT_WALL && BossWall_IsActive()) { return false; }
+
+	return true;
+}
+
+static bool AnotherReadyBossAlive(const Boss& self)
+{
+	for (const Boss& o : g_Bosses)
+	{
+		if (&o == &self) { continue; }
+		if (!o.active || o.state == BOSS_DEAD) { continue; }
+		if (!SpecialAvailable(o)) { continue; }
+		return true;
+	}
+	return false;
+}
+
+static bool WantsSpecial(const Boss& b)
+{
+	if (!SpecialAvailable(b)) { return false; }
+	if (b.special_jumps < JUMPS_PER_SPECIAL) { return false; }
+
+	if (!AnotherReadyBossAlive(b)) { return true; }
+
+	return g_SpecialTurn == b.variant;
+}
+
 void GameBoss_Initialize()
 {
-	g_tex_idle[0] = Texture_Load(L"assets/textures/Slime3_Idle_full.png");
-	g_tex_run[0] = Texture_Load(L"assets/textures/Slime3_Run_full.png");
-	g_tex_atk[0] = Texture_Load(L"assets/textures/Slime3_Attack_full.png");
-	g_tex_death[0] = Texture_Load(L"assets/textures/Slime3_Death_full.png");
+	BossVisual_Initialize();
 
-	g_tex_idle[1] = Texture_Load(L"assets/textures/Slime2_Idle_full.png");
-	g_tex_run[1] = Texture_Load(L"assets/textures/Slime2_Run_full.png");
-	g_tex_atk[1] = Texture_Load(L"assets/textures/Slime2_Attack_full.png");
-	g_tex_death[1] = Texture_Load(L"assets/textures/Slime2_Death_full.png");
+	g_SpecialTurn = BOSS_VARIANT_LASER;
 
 	for (Boss& b : g_Bosses) { b.active = false; }
 }
 
 void GameBoss_Finalize()
 {
-	for (int i = 0; i < BOSS_VARIANT_COUNT; i++)
-	{
-		Texture_Release(g_tex_idle[i]);
-		Texture_Release(g_tex_run[i]);
-		Texture_Release(g_tex_atk[i]);
-		Texture_Release(g_tex_death[i]);
-	}
+	BossVisual_Finalize();
+
 	for (Boss& b : g_Bosses) { b.active = false; }
 }
 
@@ -203,11 +364,11 @@ void GameBoss_Spawn(const Vector2& pos, int variant, bool summons)
 	{
 		if (!g_Bosses[i].active) { slot = i; break; }
 	}
-	if (slot < 0) { return; }   
+	if (slot < 0) { return; }
 
 	Boss& b = g_Bosses[slot];
 
-	b.variant = std::clamp(variant - 1, 0, BOSS_VARIANT_COUNT - 1);
+	b.variant = std::clamp(variant - 1, 0, static_cast<int>(BOSS_VARIANT_COUNT) - 1);
 	b.summons = summons;
 
 	b.health.Reset(BOSS_MAX_HP[b.variant]);
@@ -221,6 +382,12 @@ void GameBoss_Spawn(const Vector2& pos, int variant, bool summons)
 	b.state = BOSS_APPROACH;
 
 	b.state_timer = APPROACH_TIME + STAGGER_PER_INDEX * slot;
+
+	b.special_jumps = 0;
+
+	b.laser_angle = 0.0f;
+	b.laser_firing = false;
+	b.burst_timer = 0.0f;
 
 	b.phase = 1;
 	b.summon_timer = SUMMON_INTERVAL_P2;
@@ -236,7 +403,7 @@ void GameBoss_Spawn(const Vector2& pos, int variant, bool summons)
 
 bool    GameBoss_IsActive(int index) { return ValidIndex(index); }
 Vector2 GameBoss_GetPos(int index) { return ValidIndex(index) ? g_Bosses[index].pos : Vector2{ 0.0f, 0.0f }; }
-float   GameBoss_GetRadius(int index) { return BOSS_RADIUS; }
+float   GameBoss_GetRadius(int index) { (void)index; return BOSS_RADIUS; }
 
 float GameBoss_GetHPFraction(int index)
 {
@@ -251,6 +418,13 @@ bool GameBoss_HasShield(int index)
 ElementType GameBoss_GetShieldElement(int index)
 {
 	return ValidIndex(index) ? g_Bosses[index].shield_element : ELEMENT_FIRE;
+}
+
+bool GameBoss_IsGrounded(int index)
+{
+	if (!ValidIndex(index)) { return false; }
+	const Boss& b = g_Bosses[index];
+	return b.state != BOSS_AIRBORNE && b.state != BOSS_DEAD;
 }
 
 int GameBoss_GetActiveCount()
@@ -279,7 +453,7 @@ bool GameBoss_ApplyHit(int index, const HitInfo& hit)
 			return false;
 		}
 		b.shield_up = false;
-		GameTime_Hitstop(0.08f);      
+		GameTime_Hitstop(0.08f);
 	}
 
 	b.flash_timer = 0.10f;
@@ -345,7 +519,7 @@ static float UpdateStatus(Boss& b, float delta_time)
 
 				if (b.health.Damage(fx.magnitude))
 				{
-					EnterDeath(b);   
+					EnterDeath(b);
 					return speed_mul;
 				}
 			}
@@ -364,7 +538,7 @@ static void UpdatePhase(Boss& b, float delta_time)
 	if (b.phase == 1 && frac <= PHASE_2_HP)
 	{
 		b.phase = 2;
-		b.summon_timer = 1.0f;                
+		b.summon_timer = 1.0f;
 		Camera_Shake(18.0f, 0.5f);
 	}
 	else if (b.phase == 2 && frac <= PHASE_3_HP)
@@ -406,10 +580,11 @@ static void UpdateOne(Boss& b, float delta_time)
 {
 	if (b.flash_timer > 0.0f) { b.flash_timer -= delta_time; }
 
+	const float frame_time = BossVisual_GetFrameTime(b.variant, BOSS_CLIP_IDLE);
 	b.anim_timer += delta_time;
-	if (b.anim_timer >= 0.09f)
+	if (b.anim_timer >= frame_time)
 	{
-		b.anim_timer -= 0.09f;
+		b.anim_timer -= frame_time;
 		b.anim_frame++;
 	}
 
@@ -433,11 +608,23 @@ static void UpdateOne(Boss& b, float delta_time)
 	}
 
 	const float speed_mul = UpdateStatus(b, delta_time);
-	if (b.state == BOSS_DEAD) { return; }      
+	if (b.state == BOSS_DEAD) { return; }
 
 	UpdatePhase(b, delta_time);
 
 	const float clock = std::max(speed_mul, CLOCK_FLOOR);
+
+	if (b.variant == BOSS_VARIANT_WALL && BossWall_IsActive())
+	{
+		b.special_jumps = 0;
+
+		b.burst_timer -= delta_time * clock;
+		if (b.burst_timer <= 0.0f)
+		{
+			b.burst_timer = BURST_INTERVAL;
+			FireRadialBurst(b);
+		}
+	}
 
 	const Vector2 player = GamePlayer_GetPos();
 	b.state_timer -= delta_time * clock;
@@ -499,7 +686,7 @@ static void UpdateOne(Boss& b, float delta_time)
 			if (to_player.LengthSq() < SLAM_RADIUS * SLAM_RADIUS)
 			{
 				PlayerHit hit;
-				hit.damage = SLAM_DAMAGE;
+				hit.damage = std::max(1, static_cast<int>(SLAM_DAMAGE * SLAM_DAMAGE_MUL[b.variant]));
 				hit.knockback_speed = SLAM_KNOCKBACK;
 				hit.knockback_time = 0.25f;
 				hit.direction = (to_player.LengthSq() > 0.01f)
@@ -513,6 +700,8 @@ static void UpdateOne(Boss& b, float delta_time)
 			{
 				RollShield(b);
 			}
+
+			b.special_jumps++;
 		}
 		break;
 	}
@@ -520,8 +709,35 @@ static void UpdateOne(Boss& b, float delta_time)
 	case BOSS_LAND:
 		if (b.state_timer <= 0.0f)
 		{
+			if (WantsSpecial(b))
+			{
+				b.special_jumps = 0;
+				g_SpecialTurn = (b.variant == BOSS_VARIANT_LASER)
+					? BOSS_VARIANT_WALL
+					: BOSS_VARIANT_LASER;
+
+				b.state = BOSS_SPECIAL;
+				b.state_timer = SpecialDuration(b.variant);
+				b.anim_frame = 0;
+				BeginSpecial(b);
+				break;
+			}
+
 			b.state = BOSS_APPROACH;
 
+			b.state_timer = APPROACH_TIME * ((b.phase >= 3) ? 0.6f : (b.phase == 2) ? 0.8f : 1.0f);
+			b.anim_frame = 0;
+		}
+		break;
+
+	case BOSS_SPECIAL:
+		UpdateSpecial(b, delta_time * clock);
+
+		if (b.state_timer <= 0.0f)
+		{
+			EndSpecial(b);
+
+			b.state = BOSS_APPROACH;
 			b.state_timer = APPROACH_TIME * ((b.phase >= 3) ? 0.6f : (b.phase == 2) ? 0.8f : 1.0f);
 			b.anim_frame = 0;
 		}
@@ -544,6 +760,59 @@ void GameBoss_Update(float delta_time)
 // ============================================================================
 // Draw
 // ============================================================================
+static float LaserTwitch(float elapsed)
+{
+	return 1.0f + 0.14f * sinf(elapsed * 47.0f) + 0.07f * sinf(elapsed * 113.0f);
+}
+
+static void DrawLaserCharge(const Boss& b, float charge_t)
+{
+	charge_t = std::clamp(charge_t, 0.0f, 1.0f);
+
+	const int     index = static_cast<int>(&b - g_Bosses);
+	const Vector2 at = b.pos - Vector2{ 0.0f, b.jump_height };
+
+	// cycles bunch toward the end
+	const float flow = charge_t * charge_t * LASER_MOTE_CYCLES;
+
+	// cloud tightens as it fills
+	const float shell = LASER_MOTE_RADIUS * (1.0f - 0.75f * charge_t * charge_t);
+
+	for (int k = 0; k < LASER_MOTE_COUNT; k++)
+	{
+		const unsigned int h =
+			static_cast<unsigned int>((k + 1) * 73856093) ^
+			static_cast<unsigned int>((index + 1) * 19349663);
+
+		const float ang = static_cast<float>(h % 628) * 0.01f;
+		const float phase = static_cast<float>((h >> 9) % 100) * 0.01f;
+		const float speed = 0.80f + static_cast<float>((h >> 17) % 60) * 0.01f;
+
+		// wrap to 0..1 so motes recycle instead of arriving once
+		float p = flow * speed + phase;
+		p -= floorf(p);
+
+		// ease-in: they accelerate as they fall inward
+		const float e = p * p;
+		const float r = shell * (1.0f - e);
+
+		const Vector2 dir = Vector2_FromAngle(ang);
+		const Vector2 pos = at + dir * r;
+		const Vector2 tail = at + dir * (r + LASER_MOTE_STREAK * (0.30f + e));
+
+		// fade in on birth, out on arrival
+		const float fade = sinf(p * XM_PI);
+		const float a = fade * (0.30f + 0.70f * charge_t);
+
+		DrawPrim_Line(pos, tail, 2.0f + 2.0f * e, MOTE_COLOR, a * 0.70f);
+		DrawPrim_Circle(pos, 1.5f + 2.5f * e, MOTE_COLOR, a);
+	}
+
+	// the gathering core, brightening as it fills
+	DrawPrim_Circle(at, 5.0f + 18.0f * charge_t, MOTE_COLOR, 0.30f + 0.45f * charge_t);
+	DrawPrim_Circle(at, 2.0f + 9.0f * charge_t, { 1.0f, 1.0f, 1.0f }, 0.35f + 0.55f * charge_t);
+}
+
 static void DrawOne(const Boss& b)
 {
 	if (b.state == BOSS_TELEGRAPH || b.state == BOSS_AIRBORNE)
@@ -561,55 +830,76 @@ static void DrawOne(const Boss& b)
 		DrawPrim_Circle(b.jump_to, SLAM_RADIUS * t, { 0.69f, 0.69f, 0.69f }, 0.28f);
 	}
 
-	// --- shadow: shrinks as it rises
-	if (b.jump_height > 1.0f)
+	if (b.state == BOSS_SPECIAL && b.variant == BOSS_VARIANT_LASER)
 	{
-		const float s = 1.0f - (b.jump_height / JUMP_ARC_HEIGHT) * 0.45f;
-		DrawPrim_Circle(b.pos, BOSS_RADIUS * s, { 0.0f, 0.0f, 0.0f }, 0.30f);
+		const float total = LASER_WINDUP + LASER_LOCK + LASER_SWEEP;
+		const float elapsed = total - b.state_timer;
+
+		if (b.state_timer > LASER_LOCK + LASER_SWEEP)
+		{
+			// windup: thin dim tracer
+			const float t = elapsed / LASER_WINDUP;
+			DrawPrim_BeamGrow(b.pos, LaserEnd(b), LASER_THICKNESS,
+				LASER_COLOR, 0.10f, 0.22f + 0.30f * t);
+		}
+		else if (b.state_timer > LASER_SWEEP)
+		{
+			const float t = (elapsed - LASER_WINDUP) / LASER_LOCK;
+			DrawPrim_BeamGrow(b.pos, LaserEnd(b), LASER_THICKNESS,
+				LASER_COLOR, 0.10f + 0.15f * t, 0.55f + 0.45f * t);
+		}
+		else
+		{
+			// live: release shockwave, then the beam
+			const float t = 1.0f - (b.state_timer / LASER_SWEEP);
+
+			if (t < 0.12f)
+			{
+				const float k = t / 0.12f;
+				DrawPrim_Ring(b.pos, 24.0f + 190.0f * k, 7.0f * (1.0f - k),
+					LASER_COLOR, 1.0f - k);
+			}
+
+			const float grow = std::min(1.0f, t / 0.08f);
+			const float width = LASER_THICKNESS * LaserTwitch(elapsed);
+			DrawPrim_BeamGrow(b.pos, LaserEnd(b), width, LASER_COLOR, grow, 1.0f);
+		}
+
+		// charge runs across windup AND lock, collapsing as the beam fires
+		if (b.state_timer > LASER_SWEEP)
+		{
+			const float charge_span = LASER_WINDUP + LASER_LOCK;
+			DrawLaserCharge(b, std::min(1.0f, elapsed / charge_span));
+		}
 	}
 
-	// --- the slime ---
-	int tex = g_tex_idle[b.variant];
-	int frames = IDLE_FRAMES;
+	BossVisual_DrawShadow(b.pos, BOSS_RADIUS, b.jump_height, JUMP_ARC_HEIGHT);
 
+	BossClip clip = BOSS_CLIP_IDLE;
 	switch (b.state)
 	{
-	case BOSS_APPROACH:  tex = g_tex_run[b.variant]; frames = RUN_FRAMES;   break;
+	case BOSS_APPROACH:  clip = BOSS_CLIP_RUN;    break;
 	case BOSS_TELEGRAPH:
 	case BOSS_AIRBORNE:
-	case BOSS_LAND:      tex = g_tex_atk[b.variant]; frames = ATK_FRAMES;   break;
-	case BOSS_DEAD:      tex = g_tex_death[b.variant]; frames = DEATH_FRAMES; break;
+	case BOSS_LAND:
+	case BOSS_SPECIAL:   clip = BOSS_CLIP_ATTACK; break;
+	case BOSS_DEAD:      clip = BOSS_CLIP_DEATH;  break;
 	default: break;
 	}
-
-	// death plays ONCE and holds on the last frame; everything else loops
-	const int frame = (b.state == BOSS_DEAD)
-		? std::min(b.anim_frame, frames - 1)
-		: (b.anim_frame % frames);
-
-	const int row = FacingRow(GamePlayer_GetPos() - b.pos);
 
 	SpriteDrawParams p;
 	if (b.flash_timer > 0.0f) { p.color = { 2.5f, 2.5f, 2.5f }; }
 
-	Sprite_Draw(
-		tex,
-		Camera_WorldToScreenX(b.pos.x - BOSS_DRAW_SIZE * 0.5f),
-		Camera_WorldToScreenY(b.pos.y - BOSS_DRAW_SIZE * 0.5f - b.jump_height),
-		BOSS_DRAW_SIZE, BOSS_DRAW_SIZE,
-		static_cast<float>(frame * SHEET_CELL),
-		static_cast<float>(row * SHEET_CELL),
-		SHEET_CELL, SHEET_CELL,
+	BossVisual_DrawBody(
+		b.variant, clip,
+		b.anim_frame,
+		BossVisual_FacingFromDir(GamePlayer_GetPos() - b.pos),
+		b.pos, BOSS_DRAW_SIZE, b.jump_height,
 		p);
 
-	// --- elemental shield ring ---
 	if (b.shield_up && b.state != BOSS_DEAD)
 	{
-		const XMFLOAT3 col = ElementColor(b.shield_element);
-		const Vector2  at = b.pos - Vector2{ 0.0f, b.jump_height };
-
-		DrawPrim_Ring(at, BOSS_RADIUS + 18.0f, 4.0f, col, 0.9f);
-		DrawPrim_Ring(at, BOSS_RADIUS + 10.0f, 2.0f, col, 0.45f);
+		BossVisual_DrawShield(b.pos, BOSS_RADIUS, b.jump_height, b.shield_element);
 	}
 }
 

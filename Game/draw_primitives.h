@@ -22,6 +22,9 @@ void DrawPrim_Line(const Vector2& from, const Vector2& to, float thickness,
 void DrawPrim_Beam(const Vector2& from, const Vector2& to, float thickness,
     const DirectX::XMFLOAT3& color, float alpha = 1.0f);
 
+void DrawPrim_BeamGrow(const Vector2& from, const Vector2& to, float thickness,
+    const DirectX::XMFLOAT3& color, float grow, float alpha = 1.0f);
+
 void DrawPrim_Rect(const Vector2& center, float width, float height, float angle,
     const DirectX::XMFLOAT3& color, float alpha = 1.0f);
 

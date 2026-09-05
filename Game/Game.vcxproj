@@ -150,6 +150,8 @@
   <ItemGroup>
     <ClCompile Include="application.cpp" />
     <ClCompile Include="Audio.cpp" />
+    <ClCompile Include="boss_visual.cpp" />
+    <ClCompile Include="boss_wall.cpp" />
     <ClCompile Include="camera.cpp" />
     <ClCompile Include="draw_primitives.cpp" />
     <ClCompile Include="enemy_formation.cpp" />
@@ -207,6 +209,8 @@
   <ItemGroup>
     <ClInclude Include="application.h" />
     <ClInclude Include="Audio.h" />
+    <ClInclude Include="boss_visual.h" />
+    <ClInclude Include="boss_wall.h" />
     <ClInclude Include="camera.h" />
     <ClInclude Include="draw_primitives.h" />
     <ClInclude Include="element.h" />
@@ -252,6 +256,7 @@
     <ClInclude Include="player_charge.h" />
     <ClInclude Include="player_visual.h" />
     <ClInclude Include="polygon.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="result.h" />
     <ClInclude Include="scene.h" />
     <ClInclude Include="shader.h" />
@@ -282,6 +287,12 @@
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
     </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Game.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="icon.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

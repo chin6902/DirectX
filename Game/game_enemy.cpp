@@ -77,7 +77,7 @@ struct EnemyTypeInfo
 	// --- elemental shield ---
 	bool     has_shield;     
 
-	float status_resist;
+	float	 status_resist;
 };
 
 static constexpr EnemyTypeInfo g_EnemyTypeInfo[ENEMY_TYPE_COUNT] =
@@ -90,7 +90,7 @@ static constexpr EnemyTypeInfo g_EnemyTypeInfo[ENEMY_TYPE_COUNT] =
 	{ BEHAVIOUR_ORBIT,    170.0f,  2,   22.0f,   44.0f,  1,       { 0.7f, 0.85f, 1.0f }, 220.0f, 1.3f, 3, 0.0f, 0.0f, 2.60f, 420.0f,  1,     0.0f,       0.0f,            0.0f,       false,      1.0f },
 
 	// ELITE
-	{ BEHAVIOUR_CHARGE,   100.0f,  30,  34.0f,  100.0f,  2,       { 1.0f, 1.0f,  1.0f },   0.0f, 0.0f, 3, 0.0f, 0.0f,  0.0f,   0.0f,  0,    3.20f,      0.75f,         1150.0f,       true,       0.6f },
+	{ BEHAVIOUR_CHARGE,   100.0f,  30,  34.0f,  100.0f,  2,       { 1.0f, 1.0f,  1.0f },   0.0f, 0.0f, 3, 0.0f, 0.0f,  0.0f,   0.0f,  0,    3.20f,      0.75f,         1150.0f,       true,       0.7f },
 
 	// DUMMY
 	{ BEHAVIOUR_FORMATION, 0.0f,   5,   24.0f,   68.0f,  3,       { 0.8f, 0.6f,  0.9f },   0.0f, 0.0f, 1, 0.0f, 0.0f,  0.0f,   0.0f,  0,     0.0f,       0.0f,            0.0f,       false,      0.0f },
@@ -649,26 +649,17 @@ void GameEnemy_Update(float delta_time)
 			continue;
 		}
 
-		// -- - unstuck detour-- -
-			// An orbiter steers to hold a DISTANCE, so the flow field is the
-			// wrong tool for it - a field pointing at the player fights the
-			// behaviour it is trying to run. Instead it just notices when it
-			// is jammed and commits to sliding one way around.
+		// --- unstuck detour ---
 			if (e.detour_timer > 0.0f)
 			{
 				e.detour_timer -= delta_time;
 				dir = e.detour_dir;
 			}
 
-		// The charger returns a SCALED direction (its dash is far faster
-		// than its walk), so `dir` is used as-is rather than normalised.
 		const Vector2 old_pos = e.pos;
 		e.pos += dir * (info.speed * speed_mul * delta_time);
 		e.pos = GameStage_ResolvePosition(old_pos, e.pos, info.radius);
 
-		// Did it actually GO anywhere? Comparing wanted-to-moved is the
-		// only reliable stuck test: pressing into a wall looks identical
-		// to standing still from every other angle.
 		const float wanted = info.speed * speed_mul * delta_time;
 		const float moved = (e.pos - old_pos).Length();
 
@@ -678,12 +669,7 @@ void GameEnemy_Update(float delta_time)
 
 			if (e.stuck_timer > STUCK_THRESHOLD && e.detour_timer <= 0.0f)
 			{
-				// Commit for a while. Re-deciding every frame makes an
-				// enemy jitter in place instead of getting anywhere.
-				// orbit_dir already says which way this one likes to go.
-				e.detour_dir = (e.orbit_dir > 0.0f)
-					? Vector2{ -dir.y,  dir.x }
-				: Vector2{ dir.y, -dir.x };
+				e.detour_dir = (e.orbit_dir > 0.0f) ? Vector2{ -dir.y,  dir.x } : Vector2{ dir.y, -dir.x };
 				e.detour_timer = DETOUR_TIME;
 				e.stuck_timer = 0.0f;
 			}
@@ -702,11 +688,7 @@ void GameEnemy_Update(float delta_time)
 	}
 
 	// --- Separation ---
-	SpatialGrid_Clear();
-	for (int i = 0; i < g_EnemyCount; i++)
-	{
-		SpatialGrid_Insert(i, g_Enemies[i].pos);
-	}
+	GameEnemy_BuildGrid();
 
 	g_SeparationDelta = delta_time;
 	SpatialGrid_ForEachPair(SEPARATION_QUERY_RADIUS, SeparatePair);
@@ -922,6 +904,11 @@ void GameEnemy_ApplyStatus(int index, StatusType type, float duration, float mag
 		duration *= g_EnemyTypeInfo[target.type].status_resist;
 	}
 
+	if (type == STATUS_FREEZE)
+	{
+		duration *= g_EnemyTypeInfo[target.type].status_resist;
+	}
+
 	if (duration <= 0.0f) { return; }
 
 	StatusEffect& fx = g_Enemies[index].status[type];
@@ -1005,5 +992,14 @@ void GameEnemy_CleanUp()
 			g_Enemies[i] = g_Enemies[g_EnemyCount - 1];
 			g_EnemyCount--;
 		}
+	}
+}
+
+void GameEnemy_BuildGrid()
+{
+	SpatialGrid_Clear();
+	for (int i = 0; i < g_EnemyCount; i++)
+	{
+		SpatialGrid_Insert(i, g_Enemies[i].pos);
 	}
 }

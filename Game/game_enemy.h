@@ -79,5 +79,6 @@ bool GameEnemy_UsesAttack(int index);
 
 void GameEnemy_Destroy(int index);
 void GameEnemy_CleanUp();  
+void GameEnemy_BuildGrid();
 
 #endif

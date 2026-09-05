@@ -53,6 +53,10 @@ static constexpr SoundDef g_SoundDef[] =
 
 	{ "assets/sounds/boss_land.wav",             2,  0.40f, 1.00f, 0.03f,  0.00f,  false, false },
 	{ "assets/sounds/boss_warning.wav",          1,  0.95f, 1.00f, 0.00f,  0.00f,  false, false },
+	{ "assets/sounds/laser_charge.wav",			 1,  0.15f, 1.00f, 0.00f,  0.00f,  false, false },
+	{ "assets/sounds/boss_laser.wav",            1,  0.20f, 1.00f, 0.00f,  0.00f,  false, true  },
+	{ "assets/sounds/boss_shoot.wav",            1,  0.25f, 1.00f, 0.00f,  0.00f,  false, false },
+	{ "assets/sounds/boss_wall.wav",             1,  0.15f, 1.00f, 0.00f,  0.00f,  false, false },
 
 	{ "assets/sounds/button_select.wav",         1,  0.95f, 1.00f, 0.00f,  0.00f,  false, false },
 	{ "assets/sounds/button_choose.wav",         1,  0.95f, 1.00f, 0.00f,  0.00f,  false, false },

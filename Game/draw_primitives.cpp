@@ -70,13 +70,37 @@ void DrawPrim_Beam(const Vector2& from, const Vector2& to, float thickness,
 	DrawPrim_Line(from, to, thickness * 1.7f, color, alpha * 0.35f);   // glow
 	DrawPrim_Line(from, to, thickness, color, alpha);          // core
 
-	// a brighter, thinner heart makes it look hot rather than painted
 	const XMFLOAT3 hot{
 		std::min(1.0f, color.x + 0.45f),
 		std::min(1.0f, color.y + 0.45f),
 		std::min(1.0f, color.z + 0.45f)
 	};
 	DrawPrim_Line(from, to, thickness * 0.35f, hot, alpha);
+}
+
+void DrawPrim_BeamGrow(const Vector2& from, const Vector2& to,
+	float thickness, const XMFLOAT3& color, float grow, float alpha)
+{
+	grow = std::clamp(grow, 0.0f, 1.0f);
+
+	const float e = 1.0f - (1.0f - grow) * (1.0f - grow) * (1.0f - grow);
+	const float w = thickness * (0.15f + 0.85f * e);
+
+	DrawPrim_Beam(from, to, w, color, alpha); 
+
+	const XMFLOAT3 white{ 1.0f, 1.0f, 1.0f };
+	const float node = w * 1.15f;
+
+	// impact burst 
+	DrawPrim_Circle(to, node, color, alpha * 0.55f);
+	DrawPrim_Circle(to, node * 0.55f, white, alpha * 0.90f);
+	DrawPrim_Ring(to, node * 1.50f, w * 0.18f + 1.0f, color, alpha * 0.50f);
+
+	// muzzle burst 
+	const float muzzle = node * 0.80f;
+	DrawPrim_Circle(from, muzzle, color, alpha * 0.55f);
+	DrawPrim_Circle(from, muzzle * 0.55f, white, alpha * 0.90f);
+	DrawPrim_Ring(from, muzzle * 1.50f, w * 0.18f + 1.0f, color, alpha * 0.50f);
 }
 
 void DrawPrim_Circle(const Vector2& center, float radius,
@@ -135,3 +159,5 @@ void DrawPrim_Ring(const Vector2& center, float radius, float thickness,
 		DrawPrim_Rect(p, seg_len, thickness * 2.0f, a + 1.5708f, color, alpha);
 	}
 }
+
+

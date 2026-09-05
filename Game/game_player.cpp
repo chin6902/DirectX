@@ -21,6 +21,7 @@ LastUpdate : 2026/08/15
 #include "collision_debug.h"
 #include "draw_primitives.h"
 #include "player_visual.h"
+#include "boss_wall.h"
 #include "game_audio.h"
 
 #include "player_charge.h"
@@ -192,6 +193,7 @@ static void UpdateKnockback(float delta_time)
 	const Vector2 old_pos = g_Pos;
 	g_Pos += g_KnockVel * delta_time;
 	g_Pos = GameStage_ResolvePosition(old_pos, g_Pos, PLAYER_COLLIDER_RADIUS);
+	g_Pos = BossWall_ResolvePosition(old_pos, g_Pos, PLAYER_COLLIDER_RADIUS);
 
 	g_KnockVel *= KNOCKBACK_FRICTION;
 }
@@ -215,6 +217,7 @@ static void UpdateMovement(float delta_time)
 	const Vector2 old_pos = g_Pos;
 	g_Pos += Vector2_Normalize(dir) * (speed * speed_mul * delta_time);
 	g_Pos = GameStage_ResolvePosition(old_pos, g_Pos, PLAYER_COLLIDER_RADIUS);
+	g_Pos = BossWall_ResolvePosition(old_pos, g_Pos, PLAYER_COLLIDER_RADIUS);
 }
 
 static void UpdateAim()

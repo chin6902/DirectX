@@ -47,7 +47,7 @@ static constexpr WaveDef g_Waves[] =
 	{   30,  15,   1,   0,  3.5f,   8.0f,   0.0f },   // 8  everything
 	{    0,   0,   0,   1,  1.0f,   0.5f,   0.0f },   // 9  BOSS 1
 	{    8,   4,   0,   0,  3.5f,   6.0f,  20.0f },   // 10 rest
-	{    0,   0,   0,   3,  1.0f,   2.0f,   0.0f },   // 11 2 BOSSES
+	{    0,   0,   0,   6,  1.0f,   2.0f,   0.0f },   // 11 2 BOSSES 
 };
 
 static constexpr int WAVE_COUNT = static_cast<int>(sizeof(g_Waves) / sizeof(g_Waves[0]));
@@ -113,7 +113,7 @@ static void BeginWave(int index)
 	g_WaveClock = 0.0f;
 
 	int boss_owed = 0;
-	for (int v = 1; v <= BOSS_MAX; v++) { if (g_BossLeft & (1 << (v - 1))) { boss_owed++; } }
+	for (int v = 1; v <= BOSS_VARIANT_COUNT; v++) { if (g_BossLeft & (1 << (v - 1))) { boss_owed++; } }
 	const int total = g_ChasersLeft + g_OrbitersLeft + g_ElitesLeft + boss_owed;
 	g_State = (total > 0) ? WAVE_SPAWNING : WAVE_FIGHTING;
 }
@@ -186,7 +186,7 @@ static void SpawnOne()
 
 	if (g_BossLeft > 0)
 	{
-		for (int variant = 1; variant <= BOSS_MAX; variant++)
+		for (int variant = 1; variant <= BOSS_VARIANT_COUNT; variant++)
 		{
 			const int bit = 1 << (variant - 1);
 			if ((g_BossLeft & bit) == 0) { continue; }
@@ -232,7 +232,7 @@ void EnemySpawner_Update(float delta_time)
 	{
 		const WaveDef& w = g_Waves[g_WaveIndex];
 		int boss_owed = 0;
-		for (int v = 1; v <= BOSS_MAX; v++) { if (w.boss & (1 << (v - 1))) { boss_owed++; } }
+		for (int v = 1; v <= BOSS_VARIANT_COUNT; v++) { if (w.boss & (1 << (v - 1))) { boss_owed++; } }
 		const int total = w.chasers + w.orbiters + w.elites + boss_owed;
 		const float gap = (total > 1) ? (w.spawn_spread / total) : 0.0f;
 
