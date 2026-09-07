@@ -6,8 +6,9 @@ LastUpdate : 2026/04/15
 -----------------------------------------------------------------------------
 
 ============================================================================*/
-#include "collision.h"
 #include <algorithm>
+
+#include "collision.h"
 
 using namespace DirectX;
 
@@ -99,8 +100,7 @@ float Collision_PointSegmentDistanceSq(const DirectX::XMFLOAT2& point, const Dir
 		return dx * dx + dy * dy;
 	}
 
-	// Project the point onto the infinite line, expressed as a fraction t
-	// along the segment, then clamp t to [0,1] so we stay ON the segment.
+	// Project the point onto the infinite line, expressed as a fraction t along the segment, then clamp t to [0,1] 
 	float t = ((point.x - seg_start.x) * sx + (point.y - seg_start.y) * sy) / len_sq;
 	t = std::clamp(t, 0.0f, 1.0f);
 

@@ -217,7 +217,7 @@ void WaveBanner_DrawCounter()
 
 	const bool boss = EnemySpawner_IsBossWave();
 	GameText_Draw(40.0f, 34.0f, line, 0.40f,
-		boss ? XMFLOAT3{ 1.00f, 0.45f, 0.45f } : XMFLOAT3{ 0.80f, 0.85f, 0.95f });
+		boss ? XMFLOAT3{ 1.00f, 0.45f, 0.45f } : XMFLOAT3{ 0.0f, 0.0f, 0.0f });
 
 	const float remaining = EnemySpawner_GetWaveTimeout();
 	if (remaining > 0.0f)

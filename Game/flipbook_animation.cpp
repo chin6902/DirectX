@@ -4,7 +4,7 @@ Contents   :  [flipbook_animation.cpp]
 Author     : Chin Qing You
 LastUpdate : 2026/06/22
 -----------------------------------------------------------------------------
-seperate animation data and frame data
+
 ============================================================================*/
 #include <algorithm>  
 
@@ -92,16 +92,6 @@ void FlipBookAnimation_Destroy(int animation_id)
     g_Animations[animation_id].pattern_count_max = 0;
 }
 
-// ============================================================================
-// SetRange
-//
-// Restricts playback to [frame_start, frame_end] within the sheet.
-// The current frame is clamped into the new range so nothing glitches.
-//
-// Example — run only frames 4-7, then switch back to all frames:
-//   FlipBookAnimation_SetRange(id, 4, 7);   // plays 4,5,6,7 on loop
-//   FlipBookAnimation_SetRange(id, 0, 9);   // back to full loop
-// ============================================================================
 void FlipBookAnimation_SetRange(int animation_id, int frame_start, int frame_end)
 {
     if (animation_id < 0 || animation_id >= ANIMATION_MAX)
@@ -123,19 +113,6 @@ void FlipBookAnimation_SetRange(int animation_id, int frame_start, int frame_end
     a.is_finished = false;
 }
 
-// ============================================================================
-// SetMode
-//
-// Switches the play mode.  Resets is_finished so ONE_SHOT can be re-triggered.
-//
-// Example — play a hit animation once, then hold the last frame:
-//   FlipBookAnimation_SetRange(id, 5, 9);
-//   FlipBookAnimation_SetMode (id, AnimPlayMode::ONE_SHOT);
-//   // ... later, once IsFinished() returns true, the last frame is held automatically
-//
-// Example — freeze on whatever frame is showing right now:
-//   FlipBookAnimation_SetMode(id, AnimPlayMode::FREEZE);
-// ============================================================================
 void FlipBookAnimation_SetMode(int animation_id, AnimPlayMode mode)
 {
     if (animation_id < 0 || animation_id >= ANIMATION_MAX)
@@ -152,18 +129,6 @@ void FlipBookAnimation_SetMode(int animation_id, AnimPlayMode mode)
     a.is_finished = false;
 }
 
-// ============================================================================
-// SetFrame
-//
-// Jumps to a specific frame immediately.  Also resets the frame timer so the
-// new frame gets its full display time before advancing.
-//
-// Example — start from frame 3 instead of 0:
-//   FlipBookAnimation_SetFrame(id, 3);
-//
-// Example — loop just frame 5 (freeze-via-range):
-//   FlipBookAnimation_SetRange(id, 5, 5);   // range of one frame
-// ============================================================================
 void FlipBookAnimation_SetFrame(int animation_id, int frame)
 {
     if (animation_id < 0 || animation_id >= ANIMATION_MAX)
@@ -181,18 +146,6 @@ void FlipBookAnimation_SetFrame(int animation_id, int frame)
     a.is_finished = false;
 }
 
-// ============================================================================
-// IsFinished
-//
-// Returns true when a ONE_SHOT animation has played through to frame_end.
-// Always returns false for LOOP and FREEZE.
-//
-// Typical use — trigger something when an animation ends:
-//   if (FlipBookAnimation_IsFinished(g_HitAnimId))
-//   {
-//       // start next animation, destroy object, etc.
-//   }
-// ============================================================================
 bool FlipBookAnimation_IsFinished(int animation_id)
 {
     if (animation_id < 0 || animation_id >= ANIMATION_MAX)

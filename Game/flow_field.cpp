@@ -109,7 +109,7 @@ static void Rebuild(int start_c, int start_r)
 			// diagonal: only if both orthogonal neighbours are open
 			if (NX[n] != 0 && NY[n] != 0)
 			{
-				if (!Walkable(cx + NY[n], cy) || !Walkable(cx, cy + NX[n])) { continue; }
+				if (!Walkable(cx + NX[n], cy) || !Walkable(cx, cy + NY[n])) { continue; }
 			}
 
 			g_Distance[ny][nx] = next_dist;

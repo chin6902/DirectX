@@ -134,8 +134,7 @@ void Result_Update(float delta_time)
 
 	if (g_Cursor != previous_cursor) { GameAudio_Play(SND_BUTTON_SELECT); }
 
-	const bool confirm = InputKeyboard_IsTrigger(KK_ENTER)
-		|| (InputMouse_IsTrigger(MOUSE_BUTTON_LEFT) && hovered >= 0);
+	const bool confirm = InputKeyboard_IsTrigger(KK_ENTER) || (InputMouse_IsTrigger(MOUSE_BUTTON_LEFT) && hovered >= 0);
 
 	if (confirm)
 	{
@@ -190,8 +189,6 @@ void Result_Draw()
 
 		if (selected)
 		{
-			// Same pulse language as the level-up cards, so "this one is
-			// selected" means the same thing everywhere in the game.
 			const float pulse = 0.5f + 0.5f * sinf(g_PulseTime * 6.0f);
 			const float pad = 5.0f + pulse * 4.0f;
 			DrawRect(x - pad, BTN_Y - pad, BTN_W + pad * 2, BTN_H + pad * 2,

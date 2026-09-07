@@ -76,8 +76,7 @@ void Title_Update(float delta_time)
 	if (hovered && !g_WasHovered) { GameAudio_Play(SND_BUTTON_SELECT); }
 	g_WasHovered = hovered;
 
-	const bool confirm = InputKeyboard_IsTrigger(KK_ENTER)
-		|| (InputMouse_IsTrigger(MOUSE_BUTTON_LEFT) && hovered);
+	const bool confirm = InputKeyboard_IsTrigger(KK_ENTER) || (InputMouse_IsTrigger(MOUSE_BUTTON_LEFT) && hovered);
 
 	if (confirm)
 	{

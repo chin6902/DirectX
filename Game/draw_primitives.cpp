@@ -31,20 +31,6 @@ void DrawPrim_Finalize()
 	Texture_Release(g_white_texture_id);
 }
 
-void DrawPrim_Line(const Vector2& from, const Vector2& to, float thickness,
-	const XMFLOAT3& color, float alpha, float overlap)
-{
-	const Vector2 delta = to - from;
-	const float   len = delta.Length();
-	if (len < 0.5f) { return; }
-	if (len > 3000.0f) { return; }
-
-	DrawPrim_Rect(from + delta * 0.5f,
-		len * overlap, thickness * 2.0f,
-		Vector2_ToAngle(delta),
-		color, alpha);
-}
-
 void DrawPrim_Rect(const Vector2& center, float width, float height, float angle,
 	const XMFLOAT3& color, float alpha)
 {
@@ -62,6 +48,20 @@ void DrawPrim_Rect(const Vector2& center, float width, float height, float angle
 		Camera_WorldToScreenY(center.y - height * 0.5f),
 		width, height,
 		p);
+}
+
+void DrawPrim_Line(const Vector2& from, const Vector2& to, float thickness,
+	const XMFLOAT3& color, float alpha, float overlap)
+{
+	const Vector2 delta = to - from;
+	const float   len = delta.Length();
+	if (len < 0.5f) { return; }
+	if (len > 3000.0f) { return; }
+
+	DrawPrim_Rect(from + delta * 0.5f,
+		len * overlap, thickness * 2.0f,
+		Vector2_ToAngle(delta),
+		color, alpha);
 }
 
 void DrawPrim_Beam(const Vector2& from, const Vector2& to, float thickness,

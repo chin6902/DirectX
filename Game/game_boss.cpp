@@ -4,10 +4,7 @@ Contents   :  [game_boss.cpp]
 Author     : Chin Qing You
 LastUpdate : 2026/09/04
 -----------------------------------------------------------------------------
-Boss state and behaviour. All rendering lives in boss_visual.cpp.
-
-Variants are wave-ordered and named by behaviour, so the variant index IS
-the behaviour tag:
+behaviour tag:
 	0 BOSS_VARIANT_BASIC  (Slime1) - jump/slam only
 	1 BOSS_VARIANT_LASER  (Slime3) - jump/slam + sweeping laser
 	2 BOSS_VARIANT_WALL   (Slime2) - jump/slam + wall ring + radial burst
@@ -66,15 +63,15 @@ static constexpr float LASER_WINDUP = 0.60f;
 static constexpr float LASER_LOCK = 0.30f;  
 static constexpr float LASER_SWEEP = 2.40f;
 static constexpr float LASER_RANGE = 1400.0f;
-static constexpr float LASER_THICKNESS = 30.0f;
-static constexpr float LASER_TURN_RATE = 0.45f;   
+static constexpr float LASER_THICKNESS = 27.5f;
+static constexpr float LASER_TURN_RATE = 0.35f;   
 static constexpr int   LASER_DAMAGE = 2;
 static constexpr int   LASER_MOTE_COUNT = 24;
 static constexpr float LASER_MOTE_RADIUS = 150.0f;   
 static constexpr float LASER_MOTE_STREAK = 18.0f;
 static constexpr float LASER_MOTE_CYCLES = 3.0f;
 static constexpr XMFLOAT3 LASER_COLOR{ 1.00f, 0.16f, 0.10f };
-static constexpr XMFLOAT3 MOTE_COLOR{ 0.479f, 0.08f, 0.08f };
+static constexpr XMFLOAT3 MOTE_COLOR{ 0.47f, 0.08f, 0.08f };
 
 // --- wall (BOSS_VARIANT_WALL) ---
 static constexpr float WALL_CAST_TIME = 1.20f;
@@ -274,7 +271,7 @@ static void UpdateSpecial(Boss& b, float scaled_dt)
 	const CollisionCircle pc = GamePlayer_GetCollisionCircle();
 	const Vector2 pp{ pc.position.x, pc.position.y };
 
-	const float reach = LASER_THICKNESS * 0.5f + pc.radius;
+	const float reach = LASER_THICKNESS + pc.radius;
 	if (PointToSegmentDistSq(pp, b.pos, LaserEnd(b)) < reach * reach)
 	{
 		PlayerHit hit;
@@ -788,7 +785,7 @@ static void DrawLaserCharge(const Boss& b, float charge_t)
 		const float phase = static_cast<float>((h >> 9) % 100) * 0.01f;
 		const float speed = 0.80f + static_cast<float>((h >> 17) % 60) * 0.01f;
 
-		// wrap to 0..1 so motes recycle instead of arriving once
+		// wrap to 0 -> 1 so motes recycle instead of arriving once
 		float p = flow * speed + phase;
 		p -= floorf(p);
 
@@ -850,7 +847,7 @@ static void DrawOne(const Boss& b)
 		}
 		else
 		{
-			// live: release shockwave, then the beam
+			// release shockwave, then the beam
 			const float t = 1.0f - (b.state_timer / LASER_SWEEP);
 
 			if (t < 0.12f)
@@ -934,7 +931,7 @@ void GameBoss_DrawUI()
 		GameText_DrawCentered(SCREEN_WIDTH * 0.5f, y - 20.0f, label, 0.45f,
 			{ 0.85f, 0.9f, 1.0f });
 
-		// phase colour: the bar says how deep into the fight it is
+		// phase colour
 		XMFLOAT3 fill = { 0.55f, 0.85f, 1.0f };
 		if (b.phase == 2) { fill = { 1.00f, 0.75f, 0.30f }; }
 		if (b.phase == 3) { fill = { 1.00f, 0.35f, 0.35f }; }

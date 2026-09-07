@@ -31,7 +31,7 @@ static constexpr LevelReward g_LevelPlan[PLAYER_LEVEL_MAX + 1] =
 	{},                                                                        // 1  start
 	{.grants_slot = true, .offers_element = true, .charge_time_mul = 0.85f },  // 2  element
 	{.offers_stat = true, .stat_mask = EARLY_STATS },                          // 3  stat
-	{.offers_item = true },                                                    // 4  ITEM CHOICE (was stat)
+	{.offers_item = true },                                                    // 4  item
 	{.grants_slot = true, .offers_element = true, .charge_time_mul = 0.80f },  // 5  element
 	{.offers_ultimate = true },                                                // 6  boost
 };

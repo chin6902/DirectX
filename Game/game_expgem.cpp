@@ -17,7 +17,7 @@ LastUpdate : 2026/08/17
 
 using namespace DirectX;
 
-static constexpr int   GEM_MAX = 512;
+static constexpr int   GEM_MAX = 750;
 static constexpr float GEM_SIZE = 6.5f;   
 static constexpr float GEM_COLLECT_RADIUS = 22.0f;  
 static constexpr float GEM_ACCEL = 1500.0f;

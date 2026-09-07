@@ -64,7 +64,7 @@ static bool IsSolidCell(int tx, int ty)
 
 void GameStage_Initialize()
 {
-	g_TextureBg = Texture_Load(L"assets/textures/bg2.png", false);
+	g_TextureBg = Texture_Load(L"assets/textures/bg1.png", false);
 	g_TextureStone = Texture_Load(L"assets/textures/stone.png");
 
 	GenerateMap();

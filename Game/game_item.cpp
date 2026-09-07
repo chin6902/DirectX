@@ -136,7 +136,7 @@ static bool AttractToPlayer(Vector2& pos, float& speed, bool& attracted,
 {
 	const Vector2 player{ GamePlayer_GetPosX(), GamePlayer_GetPosY() };
 	const Vector2 to_player = player - pos;
-	const float   dist_sq = to_player.LengthSq();
+	const float dist_sq = to_player.LengthSq();
 
 	if (dist_sq < ITEM_COLLECT_RADIUS * ITEM_COLLECT_RADIUS) { return true; }
 

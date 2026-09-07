@@ -145,7 +145,7 @@ static void DrawHealthBar()
 
 	char hp[32];
 	snprintf(hp, sizeof(hp), "HP %d / %d", GamePlayer_GetHP(), GamePlayer_GetMaxHP());
-	GameText_Draw(HP_X + 6.0f, HP_Y + HP_H + 8.0f, hp, 0.40f, { 0.85f, 0.87f, 0.92f });
+	GameText_Draw(HP_X + 6.0f, HP_Y + HP_H + 8.0f, hp, 0.40f, { 0.0f, 0.0f, 0.0f });
 }
 
 // --- ULT meter above the HP bar ---
@@ -159,7 +159,7 @@ static void DrawUltimateBar()
 	const float bar_w = HP_W - GUTTER;
 
 	GameText_Draw(HP_X, ULT_Y - 1.0f, "ULT", 0.30f,
-		ready ? XMFLOAT3{ 1.0f, 1.0f, 1.0f } : XMFLOAT3{ 0.65f, 0.67f, 0.74f });
+		ready ? XMFLOAT3{ 1.0f, 1.0f, 1.0f } : XMFLOAT3{ 0.0f, 0.0f, 0.0f });
 
 	DrawRect(bar_x - 3.0f, ULT_Y - 3.0f, bar_w + 6.0f, ULT_BAR_H + 6.0f, { 0.06f, 0.07f, 0.09f }, 0.90f);
 	DrawRect(bar_x, ULT_Y, bar_w, ULT_BAR_H, { 0.14f, 0.16f, 0.22f }, 1.0f);
@@ -231,7 +231,7 @@ static void DrawProgress()
 		const int level = GameProgress_GetElementLevel(static_cast<ElementType>(e));
 		const XMFLOAT3 col = ElementColor(e);
 
-		GameText_Draw(PR_X, y - 2.0f, ElementShortName(e), 0.34f, col);
+		GameText_Draw(PR_X, y + 3.0f, ElementShortName(e), 0.34f, col);
 
 		const float pips_x = PR_X + 96.0f;
 		const float pip_w = (PR_W - 96.0f - PIP_GAP * (ELEMENT_LEVEL_MAX - 1))

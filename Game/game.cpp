@@ -177,8 +177,8 @@ void Game_Update(float delta_time)
 		else if (g_gameState == STATE_PAUSE) { g_gameState = STATE_PLAYING; }
 	}
 
-	if (InputKeyboard_IsTrigger(KK_O)) { GameProgress_AddXP(50); }
 #ifdef _DEBUG
+	if (InputKeyboard_IsTrigger(KK_O)) { GameProgress_AddXP(50); }
 	if (InputKeyboard_IsTrigger(KK_F1)) { GameBoss_Spawn(GamePlayer_GetPos() + Vector2{ 300.0f, 0.0f }, 1, false); }
 	if (InputKeyboard_IsTrigger(KK_F2)) { GameBoss_Spawn(GamePlayer_GetPos() + Vector2{ 300.0f, 0.0f }, 2, false); }
 	if (InputKeyboard_IsTrigger(KK_F3)) { GameBoss_Spawn(GamePlayer_GetPos() + Vector2{ 300.0f, 0.0f }, 3, false); }
